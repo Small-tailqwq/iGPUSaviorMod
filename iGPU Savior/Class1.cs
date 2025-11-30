@@ -1,4 +1,5 @@
 ﻿using BepInEx;
+using BepInEx.Configuration;
 using BepInEx.Logging;
 using System;
 using System.Collections;
@@ -10,231 +11,299 @@ using UnityEngine.SceneManagement;
 
 namespace PotatoOptimization
 {
-    // 1. 插件入口：只负责初始化和创建"不死"对象
-    [BepInPlugin("com.yourname.potatomode", "Potato Mode Optimization", "1.3.0")]
+    // ==========================================
+    // 1. 定义枚举，方便用户选择
+    // ==========================================
+    public enum WindowScaleRatio
+    {
+        OneThird = 3,   // 1/3
+        OneFourth = 4,  // 1/4
+        OneFifth = 5    // 1/5
+    }
+
+    public enum DragMode
+    {
+        Ctrl_LeftClick, // Ctrl + 左键
+        Alt_LeftClick,  // Alt + 左键
+        RightClick_Hold // 右键按住 (直接拖)
+    }
+
+    // ==========================================
+    // 2. 插件入口：负责配置定义和 Runner 创建
+    // ==========================================
+    [BepInPlugin("com.yourname.potatomode", "Potato Mode Optimization", "1.4.0")]
     public class PotatoPlugin : BaseUnityPlugin
     {
-        // 静态实例，方便Controller访问日志和配置
         public static PotatoPlugin Instance;
-        
-        // 【新增】公开的静态日志对象，让外部类可以访问
         public static ManualLogSource Log;
         
+        // --- ✨ 配置项定义 ✨ ---
+        public static ConfigEntry<KeyCode> KeyPotatoMode;
+        public static ConfigEntry<KeyCode> KeyPiPMode;
+        public static ConfigEntry<WindowScaleRatio> CfgWindowScale;
+        public static ConfigEntry<DragMode> CfgDragMode;
+
         private GameObject runnerObject;
 
         void Awake()
         {
             Instance = this;
-            
-            // 【新增】把插件自带的 Logger 赋值给公开变量
             Log = Logger;
-            
-            Log.LogWarning(">>> [V1.3] 插件启动：正在初始化 Runner (支持置顶和拖动) <<<");
 
-            // --- 关键修改：模仿天气Mod的架构 ---
-            // 创建一个独立的 GameObject
+            // 1. 初始化配置 (会自动生成/读取 .cfg 文件)
+            InitConfig();
+
+            Log.LogWarning(">>> [V1.4] 插件启动：配置已加载 (自适应分辨率 + 自定义按键) <<<");
+
+            // 2. 创建不死对象
             runnerObject = new GameObject("PotatoRunner");
-
-            // 标记为"切换场景不销毁"，这是活下来的关键！
             DontDestroyOnLoad(runnerObject);
-            runnerObject.hideFlags = HideFlags.HideAndDontSave; // 隐藏起来，防止被游戏逻辑误删
-
-            // 挂载逻辑组件
+            runnerObject.hideFlags = HideFlags.HideAndDontSave;
             runnerObject.AddComponent<PotatoController>();
 
-            Log.LogWarning(">>> Runner 创建成功，逻辑已托管给 PotatoController <<<");
+            Log.LogWarning(">>> Runner 就绪 <<<");
+        }
+
+        private void InitConfig()
+        {
+            // 分类：按键设置
+            KeyPotatoMode = Config.Bind("Hotkeys", "PotatoModeKey", KeyCode.F2, "切换土豆模式的按键");
+            KeyPiPMode = Config.Bind("Hotkeys", "PiPModeKey", KeyCode.F3, "切换画中画小窗的按键");
+
+            // 分类：小窗设置
+            CfgWindowScale = Config.Bind("Window", "ScaleRatio", WindowScaleRatio.OneThird, 
+                "小窗大小相对于屏幕分辨率的比例 (OneThird=1/3, OneFourth=1/4, OneFifth=1/5)");
+            
+            CfgDragMode = Config.Bind("Window", "DragMethod", DragMode.Ctrl_LeftClick, 
+                "拖动窗口的方式 (Ctrl_LeftClick, Alt_LeftClick, RightClick_Hold)");
         }
     }
 
-    // 2. 逻辑控制器：这才是真正干活的地方，挂在一个"不死"的对象上
+    // ==========================================
+    // 3. 逻辑控制器
+    // ==========================================
     public class PotatoController : MonoBehaviour
     {
-        // === 状态 ===
         private bool isPotatoMode = true;
         private bool isSmallWindow = false;
 
-        // === 配置 ===
         private float targetRenderScale = 0.4f;
-        private int targetWindowWidth = 640;
-        private int targetWindowHeight = 360;
+        // 这些现在是动态计算的，不再写死
+        private int currentTargetWidth;
+        private int currentTargetHeight;
+
         private float lastRunTime = 0f;
         private float runInterval = 3.0f;
 
-        // ==========================================
-        // ✨ Windows API 魔法区域
-        // ==========================================
-        [DllImport("user32.dll")]
-        private static extern IntPtr GetActiveWindow();
+        // Windows API
+        [DllImport("user32.dll")] private static extern IntPtr GetActiveWindow();
+        [DllImport("user32.dll", EntryPoint = "SetWindowLong")] private static extern int SetWindowLong32(IntPtr hWnd, int nIndex, uint dwNewLong);
+        [DllImport("user32.dll")] private static extern uint GetWindowLong(IntPtr hWnd, int nIndex);
+        [DllImport("user32.dll")] private static extern bool SetWindowPos(IntPtr hWnd, IntPtr hWndInsertAfter, int x, int y, int cx, int cy, uint uFlags);
+        [DllImport("user32.dll")] private static extern bool ReleaseCapture();
+        [DllImport("user32.dll")] private static extern int SendMessage(IntPtr hWnd, int Msg, int wParam, int lParam);
 
-        [DllImport("user32.dll")]
-        private static extern int SetWindowLong(IntPtr hWnd, int nIndex, uint dwNewLong);
-
-        [DllImport("user32.dll")]
-        private static extern uint GetWindowLong(IntPtr hWnd, int nIndex);
-
-        [DllImport("user32.dll")]
-        private static extern bool SetWindowPos(IntPtr hWnd, IntPtr hWndInsertAfter, int x, int y, int cx, int cy, uint uFlags);
-
-        // --- 拖动窗口相关的 API ---
-        [DllImport("user32.dll")]
-        private static extern bool ReleaseCapture();
-
-        [DllImport("user32.dll")]
-        private static extern int SendMessage(IntPtr hWnd, int Msg, int wParam, int lParam);
-
-        // 窗口样式常量
+        // API 常量
         private const int GWL_STYLE = -16;
-        private const uint WS_CAPTION = 0x00C00000;     // 标题栏
-        private const uint WS_THICKFRAME = 0x00040000;  // 可拖动边框
-        private const uint WS_SYSMENU = 0x00080000;     // 系统菜单
-        
-        private const uint SWP_FRAMECHANGED = 0x0020;   // 通知系统框架变了
-        private const uint SWP_NOSIZE = 0x0001;         // 保持大小
-        private const uint SWP_NOMOVE = 0x0002;         // 保持位置
-        private const uint SWP_NOZORDER = 0x0004;       // 保持层级
-        private const uint SWP_SHOWWINDOW = 0x0040;     // 显示窗口
-
-        private static readonly IntPtr HWND_TOPMOST = new IntPtr(-1);    // 置顶
-        private static readonly IntPtr HWND_NOTOPMOST = new IntPtr(-2);  // 取消置顶
-
-        // 拖动消息
+        private const uint WS_CAPTION = 0x00C00000;
+        private const uint WS_THICKFRAME = 0x00040000;
+        private const uint WS_SYSMENU = 0x00080000;
+        private const uint SWP_FRAMECHANGED = 0x0020;
+        private const uint SWP_NOSIZE = 0x0001;
+        private const uint SWP_NOMOVE = 0x0002;
+        private const uint SWP_NOZORDER = 0x0004;
+        private const uint SWP_SHOWWINDOW = 0x0040;
+        private static readonly IntPtr HWND_TOPMOST = new IntPtr(-1);
+        private static readonly IntPtr HWND_NOTOPMOST = new IntPtr(-2);
         private const int WM_NCLBUTTONDOWN = 0xA1;
         private const int HT_CAPTION = 0x2;
 
-        // ==========================================
+        // 手动拖动用的变量 (右键模式用)
+        private Vector2 dragStartMousePos;
+        private Vector2 dragStartWindowPos;
+        private bool isRightDragging = false;
+
+        // 获取窗口位置的 API (为了右键手动拖动)
+        [DllImport("user32.dll")] 
+        [return: MarshalAs(UnmanagedType.Bool)]
+        static extern bool GetWindowRect(IntPtr hWnd, out RECT lpRect);
+        
+        [StructLayout(LayoutKind.Sequential)] 
+        public struct RECT 
+        { 
+            public int Left; 
+            public int Top; 
+            public int Right; 
+            public int Bottom; 
+        }
 
         void Start()
         {
-            // 监听场景加载
             SceneManager.sceneLoaded += OnSceneLoaded;
-            // 初始应用
             if (isPotatoMode) ApplyPotatoMode(false);
-
-            PotatoPlugin.Log.LogInfo("PotatoController [终极版] 已启动：支持置顶与拖动...");
+            PotatoPlugin.Log.LogInfo($"控制器启动。拖动模式: {PotatoPlugin.CfgDragMode.Value}");
         }
 
         void Update()
         {
-            // --- F2: 切换土豆优化 ---
-            if (Input.GetKeyDown(KeyCode.F2))
+            // 1. 读取配置的按键 (不再写死 F2)
+            if (Input.GetKeyDown(PotatoPlugin.KeyPotatoMode.Value))
             {
                 isPotatoMode = !isPotatoMode;
-                if (isPotatoMode)
-                {
-                    ApplyPotatoMode(true);
-                    PotatoPlugin.Log.LogWarning(">>> [F2] 土豆模式: ON <<<");
+                if (isPotatoMode) 
+                { 
+                    ApplyPotatoMode(true); 
+                    PotatoPlugin.Log.LogWarning(">>> 土豆模式: ON <<<"); 
                 }
-                else
-                {
-                    RestoreQuality();
-                    PotatoPlugin.Log.LogWarning(">>> [F2] 土豆模式: OFF <<<");
+                else 
+                { 
+                    RestoreQuality(); 
+                    PotatoPlugin.Log.LogWarning(">>> 土豆模式: OFF <<<"); 
                 }
             }
 
-            // --- F3: 切换画中画模式 ---
-            if (Input.GetKeyDown(KeyCode.F3))
+            // 2. 读取配置的按键 (不再写死 F3)
+            if (Input.GetKeyDown(PotatoPlugin.KeyPiPMode.Value))
             {
                 ToggleWindowMode();
             }
 
-            // --- ✨ 拖动逻辑 ✨ ---
-            // 只有在小窗模式下，且按住 Alt 键 + 鼠标左键按下时触发
-            if (isSmallWindow && Input.GetMouseButtonDown(0) && (Input.GetKey(KeyCode.LeftAlt) || Input.GetKey(KeyCode.RightAlt)))
+            // 3. 处理拖动逻辑
+            if (isSmallWindow)
             {
-                DragWindow();
+                HandleDragLogic();
             }
 
-            // --- 自动巡逻 ---
+            // 4. 自动巡逻
             if (isPotatoMode)
             {
                 if (Time.realtimeSinceStartup - lastRunTime > runInterval)
                 {
-                    ApplyPotatoMode(false); // 静默执行
+                    ApplyPotatoMode(false);
                     lastRunTime = Time.realtimeSinceStartup;
                 }
             }
         }
 
-        private void OnSceneLoaded(Scene scene, LoadSceneMode mode)
+        private void HandleDragLogic()
         {
-            if (isPotatoMode) ApplyPotatoMode(false);
+            DragMode mode = PotatoPlugin.CfgDragMode.Value;
+
+            // --- 模式 A & B: 左键 + 修饰键 (使用 API 欺骗法，最丝滑) ---
+            if (mode == DragMode.Ctrl_LeftClick || mode == DragMode.Alt_LeftClick)
+            {
+                bool modifierPressed = (mode == DragMode.Ctrl_LeftClick) ? 
+                    (Input.GetKey(KeyCode.LeftControl) || Input.GetKey(KeyCode.RightControl)) : 
+                    (Input.GetKey(KeyCode.LeftAlt) || Input.GetKey(KeyCode.RightAlt));
+
+                if (Input.GetMouseButtonDown(0) && modifierPressed)
+                {
+                    DoApiDrag();
+                }
+            }
+            // --- 模式 C: 右键按住 (手动计算法，因为右键不触发系统标题栏拖动) ---
+            else if (mode == DragMode.RightClick_Hold)
+            {
+                if (Input.GetMouseButtonDown(1))
+                {
+                    isRightDragging = true;
+                    dragStartMousePos = Input.mousePosition;
+                    // 获取当前窗口位置
+                    IntPtr hWnd = GetActiveWindow();
+                    GetWindowRect(hWnd, out RECT rect);
+                    dragStartWindowPos = new Vector2(rect.Left, rect.Top);
+                }
+                
+                if (Input.GetMouseButtonUp(1))
+                {
+                    isRightDragging = false;
+                }
+
+                if (isRightDragging)
+                {
+                    // 手动计算位移
+                    Vector2 currentMouse = Input.mousePosition;
+                    Vector2 delta = currentMouse - dragStartMousePos;
+                    int newX = (int)(dragStartWindowPos.x + delta.x);
+                    int newY = (int)(dragStartWindowPos.y - delta.y);
+
+                    IntPtr hWnd = GetActiveWindow();
+                    // 手动移动窗口
+                    SetWindowPos(hWnd, IntPtr.Zero, newX, newY, 0, 0, SWP_NOSIZE | SWP_NOZORDER);
+                }
+            }
         }
 
-        // ✨ 修改后的切换窗口逻辑
+        private void DoApiDrag()
+        {
+            try 
+            { 
+                ReleaseCapture(); 
+                SendMessage(GetActiveWindow(), WM_NCLBUTTONDOWN, HT_CAPTION, 0); 
+            } 
+            catch { }
+        }
+
         private void ToggleWindowMode()
         {
             isSmallWindow = !isSmallWindow;
             if (isSmallWindow)
             {
-                // 切到小窗：设置分辨率 -> 启动协程去边框+置顶
-                Screen.SetResolution(targetWindowWidth, targetWindowHeight, FullScreenMode.Windowed);
-                StartCoroutine(SetPiPMode(true)); // 开启 PiP
-                PotatoPlugin.Log.LogWarning($">>> [F3] 开启画中画: 置顶 + 无边框 (按住Alt拖动) <<<");
+                // ✨ 自适应分辨率计算 ✨
+                CalculateTargetResolution();
+
+                Screen.SetResolution(currentTargetWidth, currentTargetHeight, FullScreenMode.Windowed);
+                StartCoroutine(SetPiPMode(true));
+                PotatoPlugin.Log.LogWarning($">>> 开启画中画: {currentTargetWidth}x{currentTargetHeight} ({PotatoPlugin.CfgWindowScale.Value}) <<<");
             }
             else
             {
-                // 恢复全屏：设置分辨率 -> 启动协程恢复样式
                 Resolution maxRes = Screen.currentResolution;
                 Screen.SetResolution(maxRes.width, maxRes.height, FullScreenMode.FullScreenWindow);
-                StartCoroutine(SetPiPMode(false)); // 关闭 PiP
-                PotatoPlugin.Log.LogWarning(">>> [F3] 恢复全屏模式 <<<");
+                StartCoroutine(SetPiPMode(false));
+                PotatoPlugin.Log.LogWarning(">>> 恢复全屏模式 <<<");
             }
         }
 
-        // 设置画中画模式 (Picture-in-Picture)
+        private void CalculateTargetResolution()
+        {
+            // 获取当前屏幕最大的分辨率 (通常是物理分辨率)
+            Resolution screenRes = Screen.currentResolution;
+            int divisor = (int)PotatoPlugin.CfgWindowScale.Value; // 枚举值直接就是 3, 4, 5
+            
+            currentTargetWidth = screenRes.width / divisor;
+            currentTargetHeight = screenRes.height / divisor;
+        }
+
+        private void OnSceneLoaded(Scene scene, LoadSceneMode mode) 
+        { 
+            if (isPotatoMode) ApplyPotatoMode(false); 
+        }
+
         private IEnumerator SetPiPMode(bool enable)
         {
             yield return null; 
-            yield return null; 
-
+            yield return null;
+            
             try
             {
                 IntPtr hWnd = GetActiveWindow();
                 uint style = GetWindowLong(hWnd, GWL_STYLE);
-
+                
                 if (enable)
                 {
-                    // === 开启：去边框 + 置顶 ===
-                    // 1. 去掉标题栏和边框
                     style &= ~(WS_CAPTION | WS_THICKFRAME | WS_SYSMENU);
-                    SetWindowLong(hWnd, GWL_STYLE, style);
-
-                    // 2. 设置置顶 (HWND_TOPMOST)
+                    SetWindowLong32(hWnd, GWL_STYLE, style);
                     SetWindowPos(hWnd, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_FRAMECHANGED | SWP_SHOWWINDOW);
-                    
-                    PotatoPlugin.Log.LogInfo("画中画模式已应用：无边框 + 置顶");
                 }
                 else
                 {
-                    // === 关闭：取消置顶 ===
                     SetWindowPos(hWnd, HWND_NOTOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_FRAMECHANGED | SWP_SHOWWINDOW);
-                    
-                    PotatoPlugin.Log.LogInfo("已取消置顶");
                 }
             }
-            catch (Exception e)
-            {
-                PotatoPlugin.Log.LogError($"窗口样式设置失败: {e.Message}");
-            }
-        }
-
-        // 实现拖动窗口
-        private void DragWindow()
-        {
-            try
-            {
-                // 1. 释放鼠标捕获，让 Unity 放手
-                ReleaseCapture();
-                
-                // 2. 获取窗口句柄
-                IntPtr hWnd = GetActiveWindow();
-
-                // 3. 欺骗 Windows：告诉它用户按在了"标题栏"上 (HT_CAPTION)
-                SendMessage(hWnd, WM_NCLBUTTONDOWN, HT_CAPTION, 0);
-            }
-            catch (Exception e)
-            {
-                PotatoPlugin.Log.LogError($"窗口拖动失败: {e.Message}");
+            catch (Exception e) 
+            { 
+                PotatoPlugin.Log.LogError($"窗口样式失败: {e.Message}"); 
             }
         }
 
@@ -252,19 +321,13 @@ namespace PotatoOptimization
                     SetProp(type, pipeline, "shadowDistance", 0f);
                     SetProp(type, pipeline, "msaaSampleCount", 1);
                 }
-                
-                // 关闭所有 Volume (光影特效)
                 var allComponents = FindObjectsOfType<MonoBehaviour>();
-                int count = 0;
                 if (allComponents != null)
                 {
                     foreach (var comp in allComponents)
                     {
                         if (comp != null && comp.enabled && comp.GetType().Name.Contains("Volume"))
-                        {
                             comp.enabled = false;
-                            count++;
-                        }
                     }
                 }
             }
