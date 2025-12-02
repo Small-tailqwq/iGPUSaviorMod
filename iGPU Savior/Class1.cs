@@ -29,6 +29,12 @@ namespace PotatoOptimization
         RightClick_Hold // 右键按住 (手动计算，已修复抽搐)
     }
 
+    public enum UIStyle
+    {
+        Modern,      // 现代化Chrome风格 (CreateModernDropdown)
+        GameNative   // 游戏原生风格 (ModPulldownCloner)
+    }
+
     // ==========================================
     // 2. 插件入口
     // ==========================================
@@ -44,6 +50,7 @@ namespace PotatoOptimization
         public static ConfigEntry<bool> CfgEnableMirror; // 启动时是否启用镜像
         public static ConfigEntry<WindowScaleRatio> CfgWindowScale;
         public static ConfigEntry<DragMode> CfgDragMode;
+        public static ConfigEntry<UIStyle> CfgUIStyle; // UI风格选择
 
         private GameObject runnerObject;
 
@@ -82,6 +89,7 @@ namespace PotatoOptimization
             CfgEnableMirror = Config.Bind("Camera", "EnableMirrorOnStart", false, "启动时是否自动启用摄像机镜像(默认关闭,建议先用UE Explorer测试)");
             CfgWindowScale = Config.Bind("Window", "ScaleRatio", WindowScaleRatio.OneThird, "小窗缩放比例");
             CfgDragMode = Config.Bind("Window", "DragMethod", DragMode.Ctrl_LeftClick, "拖动方式");
+            CfgUIStyle = Config.Bind("UI", "Style", UIStyle.Modern, "MOD设置界面风格 (Modern=现代化Chrome风格, GameNative=游戏原生风格)");
         }
     }
 
@@ -305,29 +313,40 @@ namespace PotatoOptimization
             ApplyCameraMirror();
         }
 
-        // 应用镜像到所有Canvas (不影响3D渲染管线)
+        // ✅ 改进后的镜像实现：使用投影矩阵而非Transform缩放
         private void ApplyCameraMirror()
         {
-            // 查找场景中所有Canvas
-            Canvas[] allCanvases = FindObjectsOfType<Canvas>();
+            Camera[] allCameras = Camera.allCameras;
             
-            if (allCanvases == null || allCanvases.Length == 0)
+            if (allCameras == null || allCameras.Length == 0)
             {
-                PotatoPlugin.Log.LogWarning(">>> 未找到任何Canvas，跳过镜像 <<<");
+                PotatoPlugin.Log.LogWarning(">>> 未找到任何摄像机，跳过镜像 <<<");
                 return;
             }
 
             int mirroredCount = 0;
 
-            // 只镜像Canvas，不触碰摄像机（避免破坏渲染管线）
-            foreach (Canvas canvas in allCanvases)
+            foreach (Camera cam in allCameras)
             {
-                if (canvas != null)
+                if (cam != null)
                 {
-                    // 修改Canvas的X轴缩放实现镜像
-                    Vector3 scale = canvas.transform.localScale;
-                    scale.x = isCameraMirrored ? -1f : 1f;
-                    canvas.transform.localScale = scale;
+                    // ✅ 关键修复：使用投影矩阵翻转，而不是 Transform.scale
+                    if (isCameraMirrored)
+                    {
+                        // 创建一个水平翻转的投影矩阵
+                        Matrix4x4 mat = cam.projectionMatrix;
+                        mat *= Matrix4x4.Scale(new Vector3(-1, 1, 1)); // 只翻转 X 轴
+                        cam.projectionMatrix = mat;
+                        
+                        // 反转剔除模式（重要！否则模型会消失）
+                        cam.ResetWorldToCameraMatrix();
+                    }
+                    else
+                    {
+                        // 恢复默认投影矩阵
+                        cam.ResetProjectionMatrix();
+                        cam.ResetWorldToCameraMatrix();
+                    }
                     
                     mirroredCount++;
                 }
@@ -335,11 +354,11 @@ namespace PotatoOptimization
 
             if (isCameraMirrored)
             {
-                PotatoPlugin.Log.LogWarning($">>> Canvas镜像: ON (已镜像 {mirroredCount} 个Canvas, UI和3D画面已翻转) <<<");
+                PotatoPlugin.Log.LogWarning($">>> 摄像机镜像: ON (已翻转 {mirroredCount} 个摄像机，画面已水平翻转) <<<");
             }
             else
             {
-                PotatoPlugin.Log.LogWarning($">>> Canvas镜像: OFF (已恢复 {mirroredCount} 个Canvas) <<<");
+                PotatoPlugin.Log.LogWarning($">>> 摄像机镜像: OFF (已恢复 {mirroredCount} 个摄像机) <<<");
             }
         }
 

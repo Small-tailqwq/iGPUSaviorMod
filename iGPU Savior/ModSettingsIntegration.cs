@@ -7,90 +7,724 @@ using System.Collections.Generic;
 using System.Linq;
 using ModShared;
 using BepInEx.Configuration;
-using R3;
-using System.Reflection;
 
 namespace PotatoOptimization
 {
     /// <summary>
-    /// 协程运行器(单例) - 用于运行延迟操作
+    /// 现代化UI设计系统
     /// </summary>
-    public class ModUICoroutineRunner : MonoBehaviour
+    public static class ModernUIStyle
     {
-        private static ModUICoroutineRunner _instance;
-        public static ModUICoroutineRunner Instance
+        public static class Colors
         {
-            get
-            {
-                if (_instance == null)
-                {
-                    var go = new GameObject("ModUI_CoroutineRunner");
-                    Object.DontDestroyOnLoad(go);
-                    _instance = go.AddComponent<ModUICoroutineRunner>();
-                    PotatoPlugin.Log.LogInfo("Created ModUICoroutineRunner");
-                }
-                return _instance;
-            }
+            // Chrome风格配色
+            public static readonly Color Background = new Color(0.11f, 0.11f, 0.13f, 1f);
+            public static readonly Color Surface = new Color(0.15f, 0.15f, 0.17f, 1f);
+            public static readonly Color SurfaceHover = new Color(0.18f, 0.18f, 0.20f, 1f);
+            public static readonly Color Primary = new Color(0.26f, 0.52f, 0.96f, 1f);
+            public static readonly Color PrimaryHover = new Color(0.20f, 0.46f, 0.90f, 1f);
+            public static readonly Color TextPrimary = new Color(0.95f, 0.95f, 0.95f, 1f);
+            public static readonly Color TextSecondary = new Color(0.70f, 0.70f, 0.72f, 1f);
+            public static readonly Color Divider = new Color(0.25f, 0.25f, 0.27f, 1f);
+            public static readonly Color Success = new Color(0.20f, 0.73f, 0.45f, 1f);
         }
 
-        public void RunDelayed(float seconds, System.Action action)
+        public static class Sizes
         {
-            StartCoroutine(DelayedAction(seconds, action));
-        }
-
-        private System.Collections.IEnumerator DelayedAction(float seconds, System.Action action)
-        {
-            yield return new WaitForSeconds(seconds);
-            action?.Invoke();
+            public const float RowHeight = 72f;
+            public const float HeaderHeight = 48f;
+            public const float DropdownHeight = 48f;
+            public const float ToggleSize = 44f;
+            public const float Spacing = 16f;
         }
     }
-    
-    /// <summary>
-    /// 将MOD设置集成到游戏设置UI
-    /// </summary>
+
     [HarmonyPatch(typeof(SettingUI), "Setup")]
     public class ModSettingsIntegration
     {
-        // 保存MOD相关的UI引用
         private static GameObject modContentParent;
         private static InteractableUI modInteractableUI;
-        private static SettingUI cachedSettingUI;  // 缓存SettingUI实例
+        private static SettingUI cachedSettingUI;
         
+        // UI资源缓存
+        private static TMP_FontAsset _cachedFont;
+        private static Sprite _cachedRoundedSprite;
+        private static Canvas _rootCanvas;
+
         static void Postfix(SettingUI __instance)
         {
             try
             {
-                cachedSettingUI = __instance;  // 保存引用
+                cachedSettingUI = __instance;
                 
-                // 检查是否已经创建了MOD标签
+                // 获取根Canvas
+                _rootCanvas = __instance.GetComponentInParent<Canvas>();
+                if (_rootCanvas == null)
+                {
+                    // 尝试在场景中查找
+                    _rootCanvas = Object.FindObjectOfType<Canvas>();
+                }
+                
                 if (ModSettingsManager.Instance != null && ModSettingsManager.Instance.IsInitialized)
                 {
-                    // 标签已存在，直接注册当前MOD
                     RegisterModToExistingTab();
                 }
                 else
                 {
-                    // 标签不存在，创建新标签
                     CreateModSettingsTab(__instance);
                 }
                 
-                // 关键：为所有原生标签按钮添加隐藏MOD标签的逻辑
                 HookIntoTabButtons(__instance);
             }
             catch (System.Exception e)
             {
-                PotatoPlugin.Log.LogError($"Failed to add mod settings: {e}");
+                PotatoPlugin.Log.LogError($"MOD设置集成失败: {e.Message}\n{e.StackTrace}");
             }
         }
-        
+
+        static void CreateModSettingsTab(SettingUI settingUI)
+        {
+            try
+            {
+                var creditsButton = AccessTools.Field(typeof(SettingUI), "_creditsInteractableUI")
+                    .GetValue(settingUI) as InteractableUI;
+                var creditsParent = AccessTools.Field(typeof(SettingUI), "_creditsParent")
+                    .GetValue(settingUI) as GameObject;
+
+                if (creditsButton == null || creditsParent == null)
+                {
+                    PotatoPlugin.Log.LogError("无法找到Credits按钮或面板");
+                    return;
+                }
+
+                // 克隆按钮
+                GameObject modTabButton = Object.Instantiate(creditsButton.gameObject);
+                modTabButton.name = "ModSettingsTabButton";
+                modTabButton.transform.SetParent(creditsButton.transform.parent, false);
+                modTabButton.transform.SetSiblingIndex(creditsButton.transform.GetSiblingIndex() + 1);
+
+                // 克隆内容面板
+                modContentParent = Object.Instantiate(creditsParent);
+                modContentParent.name = "ModSettingsContent";
+                modContentParent.transform.SetParent(creditsParent.transform.parent, false);
+                modContentParent.SetActive(false);
+
+                var scrollRect = modContentParent.GetComponentInChildren<ScrollRect>();
+                if (scrollRect == null)
+                {
+                    PotatoPlugin.Log.LogError("无法找到ScrollRect组件");
+                    return;
+                }
+
+                var content = scrollRect.content;
+
+                // 清空内容
+                foreach (Transform child in content)
+                {
+                    Object.Destroy(child.gameObject);
+                }
+
+                ConfigureContentLayout(content.gameObject);
+
+                // 创建管理器
+                GameObject managerObj = new GameObject("ModSettingsManager");
+                Object.DontDestroyOnLoad(managerObj);
+                var manager = managerObj.AddComponent<ModSettingsManager>();
+                manager.Initialize(modTabButton, content.gameObject, scrollRect);
+
+                // ✅ 使用 ModUICoroutineRunner 延迟更新UI
+                ModUICoroutineRunner.Instance.RunDelayed(0.3f, () => {
+                    UpdateModButtonText(modTabButton);
+                    UpdateModContentText(modContentParent);
+                    AdjustTabBarLayout(creditsButton.transform.parent);
+                });
+
+                // 设置按钮事件
+                modInteractableUI = modTabButton.GetComponent<InteractableUI>();
+                if (modInteractableUI != null)
+                {
+                    modInteractableUI.Setup();
+                    var btn = modInteractableUI.GetComponent<Button>();
+                    btn?.onClick.AddListener(() => SwitchToModTab(settingUI));
+                }
+
+                RegisterCurrentMod(manager);
+                
+                PotatoPlugin.Log.LogInfo(">>> MOD设置标签创建成功 <<<");
+            }
+            catch (System.Exception e)
+            {
+                PotatoPlugin.Log.LogError($"创建MOD标签失败: {e.Message}\n{e.StackTrace}");
+            }
+        }
+
+        static void ConfigureContentLayout(GameObject content)
+        {
+            var vGroup = content.GetComponent<VerticalLayoutGroup>();
+            if (vGroup == null) vGroup = content.AddComponent<VerticalLayoutGroup>();
+            
+            vGroup.spacing = ModernUIStyle.Sizes.Spacing;
+            vGroup.padding = new RectOffset(32, 32, 24, 24);
+            vGroup.childControlHeight = false;
+            vGroup.childControlWidth = true;
+            vGroup.childForceExpandHeight = false;
+            vGroup.childForceExpandWidth = true;
+
+            var fitter = content.GetComponent<ContentSizeFitter>();
+            if (fitter == null) fitter = content.AddComponent<ContentSizeFitter>();
+            fitter.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
+        }
+
+        static void PrepareUIResources()
+        {
+            if (_cachedFont != null) return;
+
+            try
+            {
+                // 获取字体
+                var anyText = Resources.FindObjectsOfTypeAll<TextMeshProUGUI>()
+                    .FirstOrDefault(t => t.font != null);
+                if (anyText != null) _cachedFont = anyText.font;
+
+                // 获取圆角Sprite
+                _cachedRoundedSprite = Resources.FindObjectsOfTypeAll<Sprite>()
+                    .FirstOrDefault(s => s != null && (s.name.Contains("UISprite") || s.name.Contains("Background")));
+                
+                if (_cachedRoundedSprite == null)
+                {
+                    // 备用：从任何Image组件获取
+                    var anyImage = Resources.FindObjectsOfTypeAll<Image>()
+                        .FirstOrDefault(i => i.sprite != null);
+                    if (anyImage != null) _cachedRoundedSprite = anyImage.sprite;
+                }
+            }
+            catch (System.Exception e)
+            {
+                PotatoPlugin.Log.LogWarning($"准备UI资源时出错: {e.Message}");
+            }
+        }
+
         /// <summary>
-        /// 为游戏原生的标签按钮添加点击监听，隐藏MOD标签
+        /// 注册到已存在的MOD标签页
         /// </summary>
+        static void RegisterModToExistingTab()
+        {
+            if (ModSettingsManager.Instance == null)
+            {
+                PotatoPlugin.Log.LogWarning("ModSettingsManager.Instance is null");
+                return;
+            }
+
+            RegisterCurrentMod(ModSettingsManager.Instance);
+        }
+
+        static void RegisterCurrentMod(ModSettingsManager manager)
+        {
+            // ✅ 使用 ModUICoroutineRunner
+            ModUICoroutineRunner.Instance.RunDelayed(0.5f, () => {
+                if (modContentParent == null)
+                {
+                    PotatoPlugin.Log.LogWarning("modContentParent is null");
+                    return;
+                }
+
+                var scrollRect = modContentParent.GetComponentInChildren<ScrollRect>();
+                if (scrollRect == null)
+                {
+                    PotatoPlugin.Log.LogWarning("ScrollRect not found");
+                    return;
+                }
+
+                var content = scrollRect.content;
+
+                // 清空旧内容
+                foreach (Transform child in content)
+                {
+                    Object.Destroy(child.gameObject);
+                }
+
+                PrepareUIResources();
+
+                // === 构建现代化UI ===
+                
+                CreateSectionHeader(content, "基础设置");
+                
+                CreateModernToggle(content, "画面镜像", "翻转游戏画面的水平方向",
+                    PotatoPlugin.CfgEnableMirror.Value,
+                    val => PotatoPlugin.CfgEnableMirror.Value = val);
+
+                // 小窗缩放比例下拉框
+                CreateNativeDropdown(content, "小窗缩放比例",
+                    new List<string> { "1/3 大小", "1/4 大小", "1/5 大小" },
+                    (int)PotatoPlugin.CfgWindowScale.Value - 3, // OneThird=3, OneFourth=4, OneFifth=5
+                    index => PotatoPlugin.CfgWindowScale.Value = (WindowScaleRatio)(index + 3));
+
+                // 拖动方式下拉框
+                CreateNativeDropdown(content, "小窗拖动方式",
+                    new List<string> { "Ctrl + 左键", "Alt + 左键", "右键按住" },
+                    (int)PotatoPlugin.CfgDragMode.Value,
+                    index => PotatoPlugin.CfgDragMode.Value = (DragMode)index);
+
+                CreateSectionHeader(content, "快捷键设置");
+                
+                var keyOptions = GetFunctionKeyOptions();
+                
+                CreateNativeDropdown(content, "土豆模式",
+                    keyOptions, GetKeyCodeIndex(PotatoPlugin.KeyPotatoMode.Value),
+                    index => PotatoPlugin.KeyPotatoMode.Value = GetKeyCodeFromIndex(index));
+
+                CreateNativeDropdown(content, "小窗模式",
+                    keyOptions, GetKeyCodeIndex(PotatoPlugin.KeyPiPMode.Value),
+                    index => PotatoPlugin.KeyPiPMode.Value = GetKeyCodeFromIndex(index));
+
+                CreateNativeDropdown(content, "镜像翻转",
+                    keyOptions, GetKeyCodeIndex(PotatoPlugin.KeyCameraMirror.Value),
+                    index => PotatoPlugin.KeyCameraMirror.Value = GetKeyCodeFromIndex(index));
+
+                LayoutRebuilder.ForceRebuildLayoutImmediate(content);
+            });
+        }
+
+        // ==================== UI组件构建方法 ====================
+
+        static void CreateSectionHeader(Transform parent, string text)
+        {
+            GameObject obj = new GameObject("SectionHeader");
+            obj.transform.SetParent(parent, false);
+
+            var le = obj.AddComponent<LayoutElement>();
+            le.minHeight = ModernUIStyle.Sizes.HeaderHeight;
+            le.preferredHeight = ModernUIStyle.Sizes.HeaderHeight;
+
+            var tmp = obj.AddComponent<TextMeshProUGUI>();
+            if (_cachedFont != null) tmp.font = _cachedFont;
+            tmp.text = text;
+            tmp.fontSize = 22;
+            tmp.fontStyle = FontStyles.Bold;
+            tmp.color = ModernUIStyle.Colors.Primary;
+            tmp.alignment = TextAlignmentOptions.BottomLeft;
+            tmp.margin = new Vector4(0, 0, 0, 8);
+        }
+
+        static void CreateModernToggle(Transform parent, string label, string description, 
+            bool isOn, System.Action<bool> onValueChanged)
+        {
+            GameObject row = new GameObject($"Toggle_{label}");
+            row.transform.SetParent(parent, false);
+
+            var bg = row.AddComponent<Image>();
+            bg.color = ModernUIStyle.Colors.Surface;
+            if (_cachedRoundedSprite != null)
+            {
+                bg.sprite = _cachedRoundedSprite;
+                bg.type = Image.Type.Sliced;
+            }
+
+            var hGroup = row.AddComponent<HorizontalLayoutGroup>();
+            hGroup.padding = new RectOffset(24, 20, 16, 16);
+            hGroup.spacing = 16;
+            hGroup.childAlignment = TextAnchor.MiddleLeft;
+            hGroup.childControlWidth = false;
+            hGroup.childControlHeight = false;
+
+            var le = row.AddComponent<LayoutElement>();
+            le.minHeight = ModernUIStyle.Sizes.RowHeight;
+            le.preferredHeight = ModernUIStyle.Sizes.RowHeight;
+
+            // 文本区域
+            GameObject textArea = new GameObject("TextArea");
+            textArea.transform.SetParent(row.transform, false);
+
+            var textLe = textArea.AddComponent<LayoutElement>();
+            textLe.flexibleWidth = 1;
+
+            var vGroup = textArea.AddComponent<VerticalLayoutGroup>();
+            vGroup.spacing = 4;
+            vGroup.childControlHeight = false;
+            vGroup.childControlWidth = true;
+
+            CreateLabel(textArea.transform, label, 28, ModernUIStyle.Colors.TextPrimary);
+            
+            if (!string.IsNullOrEmpty(description))
+            {
+                CreateLabel(textArea.transform, description, 22, ModernUIStyle.Colors.TextSecondary);
+            }
+
+            CreateChromeStyleToggle(row.transform, isOn, onValueChanged);
+        }
+
+        static void CreateChromeStyleToggle(Transform parent, bool isOn, System.Action<bool> onValueChanged)
+        {
+            GameObject toggleRoot = new GameObject("ChromeToggle");
+            toggleRoot.transform.SetParent(parent, false);
+
+            var le = toggleRoot.AddComponent<LayoutElement>();
+            le.minWidth = 48;
+            le.minHeight = 28;
+            le.preferredWidth = 48;
+            le.preferredHeight = 28;
+
+            var trackBg = toggleRoot.AddComponent<Image>();
+            trackBg.color = isOn ? ModernUIStyle.Colors.Primary : new Color(0.3f, 0.3f, 0.32f, 1f);
+            if (_cachedRoundedSprite != null)
+            {
+                trackBg.sprite = _cachedRoundedSprite;
+                trackBg.type = Image.Type.Sliced;
+            }
+
+            // 滑块
+            GameObject knob = new GameObject("Knob");
+            knob.transform.SetParent(toggleRoot.transform, false);
+
+            var knobRect = knob.AddComponent<RectTransform>();
+            knobRect.sizeDelta = new Vector2(20, 20);
+            knobRect.anchorMin = new Vector2(isOn ? 1f : 0f, 0.5f);
+            knobRect.anchorMax = new Vector2(isOn ? 1f : 0f, 0.5f);
+            knobRect.anchoredPosition = new Vector2(isOn ? -4f : 4f, 0);
+
+            var knobImg = knob.AddComponent<Image>();
+            knobImg.color = Color.white;
+            if (_cachedRoundedSprite != null)
+            {
+                knobImg.sprite = _cachedRoundedSprite;
+                knobImg.type = Image.Type.Sliced;
+            }
+
+            var shadow = knob.AddComponent<Shadow>();
+            shadow.effectColor = new Color(0, 0, 0, 0.3f);
+            shadow.effectDistance = new Vector2(0, -2);
+
+            var btn = toggleRoot.AddComponent<Button>();
+            btn.targetGraphic = trackBg;
+            
+            var colors = btn.colors;
+            colors.normalColor = Color.white;
+            colors.highlightedColor = new Color(0.95f, 0.95f, 0.95f, 1f);
+            btn.colors = colors;
+
+            btn.onClick.AddListener(() => {
+                bool newState = !isOn;
+                isOn = newState;
+
+                trackBg.color = newState ? ModernUIStyle.Colors.Primary : new Color(0.3f, 0.3f, 0.32f, 1f);
+                knobRect.anchorMin = new Vector2(newState ? 1f : 0f, 0.5f);
+                knobRect.anchorMax = new Vector2(newState ? 1f : 0f, 0.5f);
+                knobRect.anchoredPosition = new Vector2(newState ? -4f : 4f, 0);
+
+                onValueChanged?.Invoke(newState);
+            });
+        }
+
+        static void CreateModernDropdown(Transform parent, string label, string description, 
+            List<string> options, int currentIndex, System.Action<int> onValueChanged)
+        {
+            GameObject row = new GameObject($"Dropdown_{label}");
+            row.transform.SetParent(parent, false);
+
+            var bg = row.AddComponent<Image>();
+            bg.color = ModernUIStyle.Colors.Surface;
+            if (_cachedRoundedSprite != null)
+            {
+                bg.sprite = _cachedRoundedSprite;
+                bg.type = Image.Type.Sliced;
+            }
+
+            var hGroup = row.AddComponent<HorizontalLayoutGroup>();
+            hGroup.padding = new RectOffset(24, 20, 16, 16);
+            hGroup.spacing = 16;
+            hGroup.childAlignment = TextAnchor.MiddleLeft;
+            hGroup.childControlWidth = false;
+            hGroup.childControlHeight = false;
+
+            var le = row.AddComponent<LayoutElement>();
+            le.minHeight = ModernUIStyle.Sizes.RowHeight;
+            le.preferredHeight = ModernUIStyle.Sizes.RowHeight;
+
+            // 文本区域
+            GameObject textArea = new GameObject("TextArea");
+            textArea.transform.SetParent(row.transform, false);
+
+            var textLe = textArea.AddComponent<LayoutElement>();
+            textLe.flexibleWidth = 1;
+
+            var vGroup = textArea.AddComponent<VerticalLayoutGroup>();
+            vGroup.spacing = 4;
+            vGroup.childControlHeight = false;
+            vGroup.childControlWidth = true;
+
+            CreateLabel(textArea.transform, label, 28, ModernUIStyle.Colors.TextPrimary);
+            
+            if (!string.IsNullOrEmpty(description))
+            {
+                CreateLabel(textArea.transform, description, 22, ModernUIStyle.Colors.TextSecondary);
+            }
+
+            // 下拉框按钮
+            GameObject dropdownRoot = new GameObject("DropdownButton");
+            dropdownRoot.transform.SetParent(row.transform, false);
+
+            var dropLe = dropdownRoot.AddComponent<LayoutElement>();
+            dropLe.minWidth = 200;
+            dropLe.preferredWidth = 200;
+            dropLe.minHeight = ModernUIStyle.Sizes.DropdownHeight;
+            dropLe.preferredHeight = ModernUIStyle.Sizes.DropdownHeight;
+
+            var dropBg = dropdownRoot.AddComponent<Image>();
+            dropBg.color = ModernUIStyle.Colors.Background;
+            if (_cachedRoundedSprite != null)
+            {
+                dropBg.sprite = _cachedRoundedSprite;
+                dropBg.type = Image.Type.Sliced;
+            }
+
+            var dropBtn = dropdownRoot.AddComponent<Button>();
+            var btnColors = dropBtn.colors;
+            btnColors.normalColor = Color.white;
+            btnColors.highlightedColor = new Color(0.9f, 0.9f, 0.9f, 1f);
+            dropBtn.colors = btnColors;
+
+            // 当前显示文本
+            GameObject currentTextObj = new GameObject("CurrentText");
+            currentTextObj.transform.SetParent(dropdownRoot.transform, false);
+
+            var currentRect = currentTextObj.AddComponent<RectTransform>();
+            currentRect.anchorMin = Vector2.zero;
+            currentRect.anchorMax = Vector2.one;
+            currentRect.offsetMin = new Vector2(16, 0);
+            currentRect.offsetMax = new Vector2(-40, 0);
+
+            var currentText = currentTextObj.AddComponent<TextMeshProUGUI>();
+            if (_cachedFont != null) currentText.font = _cachedFont;
+            currentText.fontSize = 24;
+            currentText.alignment = TextAlignmentOptions.MidlineLeft;
+            currentText.color = ModernUIStyle.Colors.TextPrimary;
+            currentText.text = (options.Count > currentIndex && currentIndex >= 0) ? options[currentIndex] : "";
+
+            // 箭头图标
+            GameObject arrow = CreateArrowIcon(dropdownRoot.transform);
+
+            // === 关键修复：找到最顶层的 Canvas ===
+            Canvas highestCanvas = Object.FindObjectsOfType<Canvas>()
+                .Where(c => c.isActiveAndEnabled)
+                .OrderByDescending(c => c.sortingOrder)
+                .FirstOrDefault();
+
+            if (highestCanvas == null)
+            {
+                PotatoPlugin.Log.LogError("[Dropdown] 无法找到任何激活的 Canvas，下拉列表可能无法显示！");
+                return;
+            }
+
+            // === 创建弹出列表（挂到高层级 Canvas 下）===
+            GameObject listRoot = new GameObject($"DropdownList_{label}");
+            listRoot.transform.SetParent(highestCanvas.transform, false);
+            listRoot.SetActive(false);
+
+            // 让列表总是在最前面渲染
+            var listCanvas = listRoot.AddComponent<Canvas>();
+            listCanvas.overrideSorting = true;
+            listCanvas.sortingOrder = highestCanvas.sortingOrder + 100; // 比父 Canvas 高
+            listRoot.AddComponent<GraphicRaycaster>(); // 允许接收点击
+
+            var listRect = listRoot.GetComponent<RectTransform>(); // Canvas 会自动添加 RectTransform
+            listRect.anchorMin = Vector2.zero;
+            listRect.anchorMax = Vector2.zero;
+            listRect.pivot = new Vector2(0, 1); // 左上角为锚点
+
+            var listBg = listRoot.AddComponent<Image>();
+            listBg.color = ModernUIStyle.Colors.Surface;
+            if (_cachedRoundedSprite != null)
+            {
+                listBg.sprite = _cachedRoundedSprite;
+                listBg.type = Image.Type.Sliced;
+            }
+
+            var listShadow = listRoot.AddComponent<Shadow>();
+            listShadow.effectColor = new Color(0, 0, 0, 0.5f);
+            listShadow.effectDistance = new Vector2(0, -4);
+
+            var listVGroup = listRoot.AddComponent<VerticalLayoutGroup>();
+            listVGroup.padding = new RectOffset(8, 8, 8, 8);
+            listVGroup.spacing = 4;
+            listVGroup.childControlHeight = true;
+            listVGroup.childControlWidth = true;
+
+            var listFitter = listRoot.AddComponent<ContentSizeFitter>();
+            listFitter.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
+            listFitter.horizontalFit = ContentSizeFitter.FitMode.Unconstrained; // 宽度手动设置
+
+            // 创建选项
+            int selectedIndex = currentIndex; // 闭包变量
+            for (int i = 0; i < options.Count; i++)
+            {
+                int index = i;
+                CreateDropdownOption(listRoot.transform, options[i], index == selectedIndex, () => {
+                    selectedIndex = index;
+                    currentText.text = options[index];
+                    listRoot.SetActive(false);
+                    arrow.transform.localRotation = Quaternion.identity; // 恢复箭头
+                    onValueChanged?.Invoke(index);
+                });
+            }
+
+            // 按钮点击：显示 / 隐藏列表
+            dropBtn.onClick.AddListener(() => {
+                bool isActive = !listRoot.activeSelf;
+                listRoot.SetActive(isActive);
+
+                if (isActive)
+                {
+                    // 更新位置（每次打开时重新计算，以防窗口缩放）
+                    PositionDropdownList(dropdownRoot, listRoot, highestCanvas);
+                    arrow.transform.localRotation = Quaternion.Euler(0, 0, 180);
+                }
+                else
+                {
+                    arrow.transform.localRotation = Quaternion.identity;
+                }
+            });
+
+            // 点击外部时关闭
+            ModUICoroutineRunner.Instance.StartCoroutine(CloseOnClickOutside(listRoot, dropdownRoot, arrow, highestCanvas));
+        }
+
+        static void PositionDropdownList(GameObject button, GameObject list, Canvas targetCanvas)
+        {
+            var buttonRect = button.GetComponent<RectTransform>();
+            var listRect = list.GetComponent<RectTransform>();
+
+            // 获取 button 的世界坐标四个角
+            Vector3[] corners = new Vector3[4];
+            buttonRect.GetWorldCorners(corners);
+            Vector3 bottomLeft = corners[0]; // 左下角
+
+            // 转换到目标 Canvas 的局部坐标
+            RectTransform canvasRect = targetCanvas.GetComponent<RectTransform>();
+            Camera uiCamera = (targetCanvas.renderMode == RenderMode.ScreenSpaceOverlay) ? null : targetCanvas.worldCamera;
+
+            RectTransformUtility.ScreenPointToLocalPointInRectangle(
+                canvasRect,
+                RectTransformUtility.WorldToScreenPoint(uiCamera, bottomLeft),
+                uiCamera,
+                out Vector2 localPoint
+            );
+
+            // 设置列表的位置（在 button 下方，稍微偏移）
+            listRect.anchoredPosition = new Vector2(localPoint.x, localPoint.y - 8);
+            
+            // 宽度和 button 一致
+            listRect.sizeDelta = new Vector2(buttonRect.rect.width, listRect.sizeDelta.y);
+        }
+
+        static System.Collections.IEnumerator CloseOnClickOutside(GameObject list, GameObject button, GameObject arrow, Canvas targetCanvas)
+        {
+            Camera uiCamera = (targetCanvas.renderMode == RenderMode.ScreenSpaceOverlay) ? null : targetCanvas.worldCamera;
+
+            while (list != null)
+            {
+                if (list.activeSelf && Input.GetMouseButtonDown(0))
+                {
+                    Vector2 mousePos = Input.mousePosition;
+                    
+                    bool clickedOnList = RectTransformUtility.RectangleContainsScreenPoint(
+                        list.GetComponent<RectTransform>(), mousePos, uiCamera);
+                    
+                    bool clickedOnButton = RectTransformUtility.RectangleContainsScreenPoint(
+                        button.GetComponent<RectTransform>(), mousePos, uiCamera);
+
+                    if (!clickedOnList && !clickedOnButton)
+                    {
+                        list.SetActive(false);
+                        if (arrow != null)
+                        {
+                            arrow.transform.localRotation = Quaternion.identity;
+                        }
+                    }
+                }
+                yield return null;
+            }
+        }
+
+        static void CreateDropdownOption(Transform parent, string text, bool isSelected, System.Action onClick)
+        {
+            GameObject optObj = new GameObject($"Option_{text}");
+            optObj.transform.SetParent(parent, false);
+
+            var le = optObj.AddComponent<LayoutElement>();
+            le.minHeight = 44;
+            le.preferredHeight = 44;
+
+            var btn = optObj.AddComponent<Button>();
+            var img = optObj.AddComponent<Image>();
+            img.color = isSelected ? ModernUIStyle.Colors.SurfaceHover : Color.clear;
+
+            var colors = btn.colors;
+            colors.normalColor = Color.white;
+            colors.highlightedColor = new Color(0.9f, 0.9f, 0.9f, 1f);
+            btn.colors = colors;
+
+            GameObject textObj = new GameObject("Text");
+            textObj.transform.SetParent(optObj.transform, false);
+
+            var textRect = textObj.AddComponent<RectTransform>();
+            textRect.anchorMin = Vector2.zero;
+            textRect.anchorMax = Vector2.one;
+            textRect.offsetMin = new Vector2(16, 0);
+            textRect.offsetMax = new Vector2(-16, 0);
+
+            var tmp = textObj.AddComponent<TextMeshProUGUI>();
+            if (_cachedFont != null) tmp.font = _cachedFont;
+            tmp.fontSize = 24;
+            tmp.text = text;
+            tmp.alignment = TextAlignmentOptions.MidlineLeft;
+            tmp.color = ModernUIStyle.Colors.TextPrimary;
+
+            btn.onClick.AddListener(() => onClick?.Invoke());
+        }
+
+        static GameObject CreateArrowIcon(Transform parent)
+        {
+            GameObject arrow = new GameObject("Arrow");
+            arrow.transform.SetParent(parent, false);
+
+            var rect = arrow.AddComponent<RectTransform>();
+            rect.anchorMin = new Vector2(1, 0.5f);
+            rect.anchorMax = new Vector2(1, 0.5f);
+            rect.sizeDelta = new Vector2(20, 20);
+            rect.anchoredPosition = new Vector2(-16, 0);
+
+            var text = arrow.AddComponent<TextMeshProUGUI>();
+            if (_cachedFont != null) text.font = _cachedFont;
+            text.text = "▼";
+            text.fontSize = 16;
+            text.alignment = TextAlignmentOptions.Center;
+            text.color = ModernUIStyle.Colors.TextSecondary;
+
+            return arrow;
+        }
+
+        static GameObject CreateLabel(Transform parent, string text, float fontSize, Color color)
+        {
+            GameObject obj = new GameObject("Label");
+            obj.transform.SetParent(parent, false);
+
+            var tmp = obj.AddComponent<TextMeshProUGUI>();
+            if (_cachedFont != null) tmp.font = _cachedFont;
+            tmp.text = text;
+            tmp.fontSize = fontSize;
+            tmp.color = color;
+            tmp.alignment = TextAlignmentOptions.MidlineLeft;
+            tmp.enableWordWrapping = true;
+
+            return obj;
+        }
+
+        // ==================== 辅助方法 ====================
+        
         static void HookIntoTabButtons(SettingUI settingUI)
         {
             try
             {
-                // 获取所有原生标签按钮和对应的父对象
                 var generalButton = AccessTools.Field(typeof(SettingUI), "_generalInteractableUI").GetValue(settingUI) as InteractableUI;
                 var graphicButton = AccessTools.Field(typeof(SettingUI), "_graphicInteractableUI").GetValue(settingUI) as InteractableUI;
                 var audioButton = AccessTools.Field(typeof(SettingUI), "_audioInteractableUI").GetValue(settingUI) as InteractableUI;
@@ -101,23 +735,17 @@ namespace PotatoOptimization
                 var audioParent = AccessTools.Field(typeof(SettingUI), "_audioParent").GetValue(settingUI) as GameObject;
                 var creditsParent = AccessTools.Field(typeof(SettingUI), "_creditsParent").GetValue(settingUI) as GameObject;
                 
-                // 为每个按钮添加点击监听
                 AddHideModTabListener(generalButton, generalParent);
                 AddHideModTabListener(graphicButton, graphicParent);
                 AddHideModTabListener(audioButton, audioParent);
                 AddHideModTabListener(creditsButton, creditsParent);
-                
-                PotatoPlugin.Log.LogWarning(">>> Successfully hooked into all tab buttons! <<<");
             }
             catch (System.Exception e)
             {
-                PotatoPlugin.Log.LogError($"Failed to hook into tab buttons: {e}");
+                PotatoPlugin.Log.LogError($"挂钩标签按钮失败: {e}");
             }
         }
         
-        /// <summary>
-        /// 为按钮添加隐藏MOD标签的监听器
-        /// </summary>
         static void AddHideModTabListener(InteractableUI button, GameObject targetParent)
         {
             if (button == null) return;
@@ -126,301 +754,34 @@ namespace PotatoOptimization
             if (uiButton != null)
             {
                 uiButton.onClick.AddListener(() => {
-                    // 使用协程延迟执行,确保游戏原生逻辑先执行
                     if (modContentParent != null && modContentParent.activeSelf)
                     {
-                        // 延迟一帧执行隐藏逻辑
-                        ModSettingsManager.Instance.StartCoroutine(HideModTabAndShowTarget(button, targetParent));
+                        // ✅ 使用 ModUICoroutineRunner
+                        ModUICoroutineRunner.Instance.StartCoroutine(HideModTabAndShowTarget(button, targetParent));
                     }
                 });
             }
         }
         
-        /// <summary>
-        /// 延迟隐藏MOD标签并强制显示目标标签
-        /// </summary>
         static System.Collections.IEnumerator HideModTabAndShowTarget(InteractableUI targetButton, GameObject targetParent)
         {
-            // 等待一帧,让游戏的逻辑先执行
             yield return null;
             
-            // 隐藏MOD标签
             if (modContentParent != null)
             {
                 modContentParent.SetActive(false);
                 modInteractableUI?.DeactivateUseUI(false);
             }
             
-            // 强制显示目标标签(即使游戏认为它已经是当前标签)
             if (targetParent != null && !targetParent.activeSelf)
             {
                 targetParent.SetActive(true);
                 targetButton?.ActivateUseUI(false);
-                PotatoPlugin.Log.LogInfo($"Force shown target tab: {targetParent.name}");
             }
         }
         
-        /// <summary>
-        /// 更新MOD按钮的文本
-        /// </summary>
-        static void UpdateModButtonText(GameObject modTabButton)
-        {
-            try
-            {
-                PotatoPlugin.Log.LogInfo($"开始更新MOD按钮文本，按钮名称: {modTabButton.name}");
-                
-                // 方法1: 深度递归查找所有TextMeshProUGUI
-                int textCount = 0;
-                RecursivelyChangeText(modTabButton.transform, ref textCount);
-                
-                PotatoPlugin.Log.LogInfo($"方法1: 递归修改了 {textCount} 个文本组件");
-                
-                // 方法2: 使用GetComponentsInChildren (包括inactive)
-                var allTexts = modTabButton.GetComponentsInChildren<TextMeshProUGUI>(true);
-                PotatoPlugin.Log.LogInfo($"方法2: GetComponentsInChildren 找到 {allTexts.Length} 个文本组件");
-                
-                foreach (var text in allTexts)
-                {
-                    if (text.text != "MOD")
-                    {
-                        PotatoPlugin.Log.LogInfo($"  修改文本: '{text.text}' -> 'MOD' (路径: {GetGameObjectPath(text.gameObject)})");
-                        text.text = "MOD";
-                    }
-                }
-                
-                PotatoPlugin.Log.LogInfo("MOD按钮文本更新完成");
-            }
-            catch (System.Exception e)
-            {
-                PotatoPlugin.Log.LogError($"更新MOD按钮文本失败: {e.Message}\n{e.StackTrace}");
-            }
-        }
-        
-        /// <summary>
-        /// 更新MOD内容页面的标题文本
-        /// </summary>
-        static void UpdateModContentText(GameObject modContentParent)
-        {
-            try
-            {
-                PotatoPlugin.Log.LogInfo($"开始更新MOD内容页面文本，页面名称: {modContentParent.name}");
-                
-                // 查找内容页面中直接的TextMeshProUGUI组件(通常是标题)
-                var titleText = modContentParent.GetComponent<TextMeshProUGUI>();
-                if (titleText != null)
-                {
-                    PotatoPlugin.Log.LogInfo($"找到内容页面标题文本: '{titleText.text}'");
-                    titleText.text = "MOD设置";
-                }
-                
-                // 查找ScrollRect的Content路径
-                var scrollRect = modContentParent.GetComponentInChildren<ScrollRect>();
-                Transform contentTransform = null;
-                if (scrollRect != null && scrollRect.content != null)
-                {
-                    contentTransform = scrollRect.content.transform;
-                    PotatoPlugin.Log.LogInfo($"找到ScrollRect Content: {GetGameObjectPath(contentTransform.gameObject)}");
-                }
-                
-                // 查找所有子节点中的文本
-                var allTexts = modContentParent.GetComponentsInChildren<TextMeshProUGUI>(true);
-                PotatoPlugin.Log.LogInfo($"内容页面共找到 {allTexts.Length} 个文本组件");
-                
-                foreach (var text in allTexts)
-                {
-                    // 跳过Content内部的文本(那是我们添加的设置项)
-                    if (contentTransform != null && text.transform.IsChildOf(contentTransform))
-                    {
-                        PotatoPlugin.Log.LogInfo($"  跳过Content内的文本: {text.text}");
-                        continue;
-                    }
-                    
-                    // 修改标题类文本
-                    if (text.text.Contains("制作人员") || text.text.Contains("Credits"))
-                    {
-                        PotatoPlugin.Log.LogInfo($"  修改内容标题: '{text.text}' -> 'MOD设置' (路径: {GetGameObjectPath(text.gameObject)})");
-                        text.text = "MOD设置";
-                    }
-                }
-                
-                PotatoPlugin.Log.LogInfo("MOD内容页面文本更新完成");
-            }
-            catch (System.Exception e)
-            {
-                PotatoPlugin.Log.LogError($"更新MOD内容页面文本失败: {e.Message}\n{e.StackTrace}");
-            }
-        }
-        
-        /// <summary>
-        /// 延迟更新MOD标签UI(修改文本和调整布局)
-        /// </summary>
-        static System.Collections.IEnumerator UpdateModTabUI(GameObject modTabButton, Transform tabBarParent)
-        {
-            // 等待UI完全实例化
-            yield return null;
-            
-            // 递归查找并修改所有TextMeshProUGUI组件
-            int textCount = 0;
-            RecursivelyChangeText(modTabButton.transform, ref textCount);
-            
-            PotatoPlugin.Log.LogInfo($"Total changed {textCount} text components to 'MOD'");
-            
-            // 调整标签栏的布局以居中显示所有标签
-            yield return null; // 再等一帧
-            AdjustTabBarLayout(tabBarParent);
-        }
-        
-        /// <summary>
-        /// 递归修改所有文本组件
-        /// </summary>
-        static void RecursivelyChangeText(Transform parent, ref int count)
-        {
-            // 检查当前对象
-            var text = parent.GetComponent<TextMeshProUGUI>();
-            if (text != null)
-            {
-                string oldText = text.text;
-                text.text = "MOD";
-                PotatoPlugin.Log.LogInfo($"  [{count}] Changed '{oldText}' -> '{text.text}' in {GetGameObjectPath(parent.gameObject)}");
-                count++;
-            }
-            
-            // 递归检查所有子对象
-            for (int i = 0; i < parent.childCount; i++)
-            {
-                RecursivelyChangeText(parent.GetChild(i), ref count);
-            }
-        }
-        
-        /// <summary>
-        /// 获取GameObject的完整路径(用于调试)
-        /// </summary>
-        static string GetGameObjectPath(GameObject obj)
-        {
-            string path = obj.name;
-            Transform current = obj.transform.parent;
-            while (current != null)
-            {
-                path = current.name + "/" + path;
-                current = current.parent;
-            }
-            return path;
-        }
-        
-        /// <summary>
-        /// 延迟调整布局
-        /// </summary>
-        static System.Collections.IEnumerator DelayedLayoutAdjustment(Transform tabBarParent)
-        {
-            // 等待2帧确保UI完全构建
-            yield return null;
-            yield return null;
-            
-            PotatoPlugin.Log.LogInfo("Starting delayed layout adjustment...");
-            AdjustTabBarLayout(tabBarParent);
-        }
-        
-        /// <summary>
-        /// 创建全新的 "MOD Settings" 标签页
-        /// </summary>
-        static void CreateModSettingsTab(SettingUI settingUI)
-        {
-            // 1. 获取Credits标签按钮作为参考
-            var creditsButton = AccessTools.Field(typeof(SettingUI), "_creditsInteractableUI")
-                .GetValue(settingUI) as InteractableUI;
-            
-            if (creditsButton == null)
-            {
-                PotatoPlugin.Log.LogError("Cannot find credits button!");
-                return;
-            }
-            
-            // 2. 克隆Credits按钮创建MOD标签按钮
-            GameObject modTabButton = Object.Instantiate(creditsButton.gameObject);
-            modTabButton.name = "ModSettingsTabButton";
-            modTabButton.transform.SetParent(creditsButton.transform.parent, false);
-            modTabButton.transform.SetSiblingIndex(creditsButton.transform.GetSiblingIndex() + 1);
-            
-            // 3. 克隆Credits内容页面
-            var creditsParent = AccessTools.Field(typeof(SettingUI), "_creditsParent")
-                .GetValue(settingUI) as GameObject;
-            
-            modContentParent = Object.Instantiate(creditsParent);
-            modContentParent.name = "ModSettingsContent";
-            modContentParent.transform.SetParent(creditsParent.transform.parent, false);
-            modContentParent.SetActive(false);
-            
-            // 清空原有内容（保留ScrollRect）
-            var scrollRect = modContentParent.GetComponentInChildren<ScrollRect>();
-            var content = scrollRect.content;
-            
-            // 清除所有子对象
-            foreach (Transform child in content)
-            {
-                Object.Destroy(child.gameObject);
-            }
-            
-            // 重新配置Content
-            var contentLayout = content.gameObject.GetComponent<VerticalLayoutGroup>();
-            if (contentLayout == null)
-            {
-                contentLayout = content.gameObject.AddComponent<VerticalLayoutGroup>();
-            }
-            contentLayout.spacing = 20;
-            contentLayout.padding = new RectOffset(0, 0, 20, 20);
-            contentLayout.childControlHeight = false;
-            contentLayout.childControlWidth = true;
-            contentLayout.childForceExpandHeight = false;
-            contentLayout.childForceExpandWidth = true;
-            
-            var contentFitter = content.gameObject.GetComponent<ContentSizeFitter>();
-            if (contentFitter == null)
-            {
-                contentFitter = content.gameObject.AddComponent<ContentSizeFitter>();
-            }
-            contentFitter.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
-            
-            // 4. 创建ModSettingsManager单例
-            GameObject managerObj = new GameObject("ModSettingsManager");
-            Object.DontDestroyOnLoad(managerObj);
-            var manager = managerObj.AddComponent<ModSettingsManager>();
-            
-            // 初始化
-            manager.Initialize(modTabButton, content.gameObject, scrollRect);
-            
-            // 延迟修改按钮文本和布局(使用独立的CoroutineRunner)
-            ModUICoroutineRunner.Instance.RunDelayed(0.3f, () => {
-                UpdateModButtonText(modTabButton);
-                UpdateModContentText(modContentParent);
-                AdjustTabBarLayout(creditsButton.transform.parent);
-            });
-            
-            // 5. 设置按钮点击事件
-            modInteractableUI = modTabButton.GetComponent<InteractableUI>();
-            if (modInteractableUI != null)
-            {
-                modInteractableUI.Setup();
-                var btn = modInteractableUI.GetComponent<Button>();
-                if (btn != null)
-                {
-                    btn.onClick.AddListener(() => {
-                        SwitchToModTab(settingUI);
-                    });
-                }
-            }
-            
-            // 6. 注册当前MOD
-            RegisterCurrentMod(manager);
-            
-            PotatoPlugin.Log.LogWarning(">>> MOD Settings tab created successfully! <<<");
-        }
-        
-        /// <summary>
-        /// 切换到MOD标签页
-        /// </summary>
         static void SwitchToModTab(SettingUI settingUI)
         {
-            // 隐藏其他标签页
             var generalParent = AccessTools.Field(typeof(SettingUI), "_generalParent").GetValue(settingUI) as GameObject;
             var graphicParent = AccessTools.Field(typeof(SettingUI), "_graphicParent").GetValue(settingUI) as GameObject;
             var audioParent = AccessTools.Field(typeof(SettingUI), "_audioParent").GetValue(settingUI) as GameObject;
@@ -431,7 +792,6 @@ namespace PotatoOptimization
             audioParent?.SetActive(false);
             creditsParent?.SetActive(false);
             
-            // 取消其他按钮的激活状态
             var generalButton = AccessTools.Field(typeof(SettingUI), "_generalInteractableUI").GetValue(settingUI) as InteractableUI;
             var graphicButton = AccessTools.Field(typeof(SettingUI), "_graphicInteractableUI").GetValue(settingUI) as InteractableUI;
             var audioButton = AccessTools.Field(typeof(SettingUI), "_audioInteractableUI").GetValue(settingUI) as InteractableUI;
@@ -442,179 +802,67 @@ namespace PotatoOptimization
             audioButton?.DeactivateUseUI(false);
             creditsButton?.DeactivateUseUI(false);
             
-            // 激活MOD标签
-            modInteractableUI.ActivateUseUI(false);
-            modContentParent.SetActive(true);
+            modInteractableUI?.ActivateUseUI(false);
+            modContentParent?.SetActive(true);
             
-            // 强制重建布局并滚动到顶部
-            LayoutRebuilder.ForceRebuildLayoutImmediate(modContentParent.GetComponent<RectTransform>());
-            var scrollRect = modContentParent.GetComponentInChildren<ScrollRect>();
+            var scrollRect = modContentParent?.GetComponentInChildren<ScrollRect>();
             if (scrollRect != null)
             {
+                LayoutRebuilder.ForceRebuildLayoutImmediate(modContentParent.GetComponent<RectTransform>());
                 scrollRect.verticalNormalizedPosition = 1f;
             }
-            
-            PotatoPlugin.Log.LogInfo("Switched to MOD Settings tab");
         }
         
-        /// <summary>
-        /// 注册到已存在的标签页
-        /// </summary>
-        static void RegisterModToExistingTab()
+        static void UpdateModButtonText(GameObject modTabButton)
         {
-            RegisterCurrentMod(ModSettingsManager.Instance);
-        }
-        
-        /// <summary>
-        /// 注册当前MOD的设置项
-        /// </summary>
-        static void RegisterCurrentMod(ModSettingsManager manager)
-        {
-            var modSection = manager.RegisterMod("iGPU Savior", "1.6.0");
-            
-            if (modSection == null)
+            try
             {
-                PotatoPlugin.Log.LogWarning("Failed to register mod - already registered or manager not ready");
-                return;
+                var allTexts = modTabButton.GetComponentsInChildren<TextMeshProUGUI>(true);
+                foreach (var text in allTexts)
+                {
+                    text.text = "MOD";
+                }
             }
-            
-            // 1. 是否开启镜像
-            manager.AddToggle(
-                modSection,
-                "是否开启镜像",
-                PotatoPlugin.CfgEnableMirror.Value,
-                (value) => {
-                    PotatoPlugin.CfgEnableMirror.Value = value;
-                    PotatoPlugin.Log.LogInfo($"Mirror mode set to: {value}");
-                }
-            );
-            
-            // 2. 土豆模式绑定按键
-            var potatoKeyOptions = GetFunctionKeyOptions();
-            int potatoKeyIndex = GetKeyCodeIndex(PotatoPlugin.KeyPotatoMode.Value);
-            
-            manager.AddDropdown(
-                modSection,
-                "土豆模式绑定按键",
-                potatoKeyOptions,
-                potatoKeyIndex,
-                (index) => {
-                    var keyCode = GetKeyCodeFromIndex(index);
-                    PotatoPlugin.KeyPotatoMode.Value = keyCode;
-                    PotatoPlugin.Log.LogInfo($"Potato mode key set to: {keyCode}");
-                }
-            );
-            
-            // 3. 小窗模式绑定按键
-            int pipKeyIndex = GetKeyCodeIndex(PotatoPlugin.KeyPiPMode.Value);
-            
-            manager.AddDropdown(
-                modSection,
-                "小窗模式绑定按键",
-                potatoKeyOptions,
-                pipKeyIndex,
-                (index) => {
-                    var keyCode = GetKeyCodeFromIndex(index);
-                    PotatoPlugin.KeyPiPMode.Value = keyCode;
-                    PotatoPlugin.Log.LogInfo($"PiP mode key set to: {keyCode}");
-                }
-            );
-            
-            // 4. 镜像绑定按键
-            int mirrorKeyIndex = GetKeyCodeIndex(PotatoPlugin.KeyCameraMirror.Value);
-            
-            manager.AddDropdown(
-                modSection,
-                "镜像模式绑定按键",
-                potatoKeyOptions,
-                mirrorKeyIndex,
-                (index) => {
-                    var keyCode = GetKeyCodeFromIndex(index);
-                    PotatoPlugin.KeyCameraMirror.Value = keyCode;
-                    PotatoPlugin.Log.LogInfo($"Mirror mode key set to: {keyCode}");
-                }
-            );
-            
-            // 5. 小窗时拖动模式
-            var dragModeOptions = new List<string> { "CTRL+左键", "ALT+左键", "右键" };
-            int dragModeIndex = (int)PotatoPlugin.CfgDragMode.Value;
-            
-            manager.AddDropdown(
-                modSection,
-                "小窗时拖动模式",
-                dragModeOptions,
-                dragModeIndex,
-                (index) => {
-                    PotatoPlugin.CfgDragMode.Value = (DragMode)index;
-                    PotatoPlugin.Log.LogInfo($"Drag mode set to: {(DragMode)index}");
-                }
-            );
-            
-            PotatoPlugin.Log.LogWarning(">>> iGPU Savior settings registered! <<<");
-        }
-        
-        /// <summary>
-        /// 获取功能键选项列表
-        /// </summary>
-        static List<string> GetFunctionKeyOptions()
-        {
-            return new List<string>
+            catch (System.Exception e)
             {
-                "F1", "F2", "F3", "F4", "F5", "F6",
-                "F7", "F8", "F9", "F10", "F11", "F12"
-            };
-        }
-        
-        /// <summary>
-        /// 从KeyCode获取下拉菜单索引
-        /// </summary>
-        static int GetKeyCodeIndex(KeyCode keyCode)
-        {
-            switch (keyCode)
-            {
-                case KeyCode.F1: return 0;
-                case KeyCode.F2: return 1;
-                case KeyCode.F3: return 2;
-                case KeyCode.F4: return 3;
-                case KeyCode.F5: return 4;
-                case KeyCode.F6: return 5;
-                case KeyCode.F7: return 6;
-                case KeyCode.F8: return 7;
-                case KeyCode.F9: return 8;
-                case KeyCode.F10: return 9;
-                case KeyCode.F11: return 10;
-                case KeyCode.F12: return 11;
-                default: return 1; // 默认F2
+                PotatoPlugin.Log.LogError($"更新按钮文本失败: {e}");
             }
         }
         
-        /// <summary>
-        /// 从下拉菜单索引获取KeyCode
-        /// </summary>
-        static KeyCode GetKeyCodeFromIndex(int index)
+        static void UpdateModContentText(GameObject modContentParent)
         {
-            switch (index)
+            try
             {
-                case 0: return KeyCode.F1;
-                case 1: return KeyCode.F2;
-                case 2: return KeyCode.F3;
-                case 3: return KeyCode.F4;
-                case 4: return KeyCode.F5;
-                case 5: return KeyCode.F6;
-                case 6: return KeyCode.F7;
-                case 7: return KeyCode.F8;
-                case 8: return KeyCode.F9;
-                case 9: return KeyCode.F10;
-                case 10: return KeyCode.F11;
-                case 11: return KeyCode.F12;
-                default: return KeyCode.F2;
+                var titleText = modContentParent.GetComponent<TextMeshProUGUI>();
+                if (titleText != null) titleText.text = "MOD设置";
+                
+                var scrollRect = modContentParent.GetComponentInChildren<ScrollRect>();
+                Transform contentTransform = null;
+                if (scrollRect?.content != null)
+                {
+                    contentTransform = scrollRect.content.transform;
+                }
+                
+                var allTexts = modContentParent.GetComponentsInChildren<TextMeshProUGUI>(true);
+                foreach (var text in allTexts)
+                {
+                    if (contentTransform != null && text.transform.IsChildOf(contentTransform))
+                    {
+                        continue;
+                    }
+                    
+                    if (text.text.Contains("制作人员") || text.text.Contains("Credits"))
+                    {
+                        text.text = "MOD设置";
+                    }
+                }
+            }
+            catch (System.Exception e)
+            {
+                PotatoPlugin.Log.LogError($"更新内容文本失败: {e}");
             }
         }
         
-        /// <summary>
-        /// 调整标签栏布局,使5个标签居中显示
-        /// 通过调整容器的RectTransform位置来实现居中
-        /// </summary>
         static void AdjustTabBarLayout(Transform tabBarParent)
         {
             try
@@ -622,78 +870,279 @@ namespace PotatoOptimization
                 var rectTransform = tabBarParent.GetComponent<RectTransform>();
                 var horizontalLayout = tabBarParent.GetComponent<HorizontalLayoutGroup>();
                 
-                if (horizontalLayout == null || rectTransform == null)
-                {
-                    PotatoPlugin.Log.LogWarning("HorizontalLayoutGroup or RectTransform not found");
-                    return;
-                }
+                if (horizontalLayout == null || rectTransform == null) return;
 
-                // 记录当前状态
-                PotatoPlugin.Log.LogInfo($"Tab bar has {tabBarParent.childCount} children");
-                PotatoPlugin.Log.LogInfo($"Original position: {rectTransform.anchoredPosition}");
-                
-                // 强制刷新布局以获取正确的尺寸
                 LayoutRebuilder.ForceRebuildLayoutImmediate(rectTransform);
                 
-                // 获取第一个标签的宽度(所有标签应该是相同宽度)
-                if (tabBarParent.childCount == 0)
-                {
-                    PotatoPlugin.Log.LogWarning("No children found in tab bar");
-                    return;
-                }
+                if (tabBarParent.childCount == 0) return;
                 
                 var firstChild = tabBarParent.GetChild(0).GetComponent<RectTransform>();
-                if (firstChild == null)
-                {
-                    PotatoPlugin.Log.LogWarning("First child has no RectTransform");
-                    return;
-                }
+                if (firstChild == null) return;
                 
-                // 计算宽度
                 float tabWidth = firstChild.rect.width;
                 float spacing = horizontalLayout.spacing;
                 int tabCount = tabBarParent.childCount;
                 
-                // 原4标签总宽度
                 float original4TabsWidth = (tabWidth * 4) + (spacing * 3);
-                
-                // 现5标签总宽度
                 float current5TabsWidth = (tabWidth * 5) + (spacing * 4);
-                
-                // 宽度增加量
                 float widthIncrease = current5TabsWidth - original4TabsWidth;
-                
-                // 容器需要向左移动增加宽度的一半(因为标签从左到右排列)
                 float positionOffset = widthIncrease / 2f;
                 
-                PotatoPlugin.Log.LogInfo($"Tab width: {tabWidth}, Spacing: {spacing}");
-                PotatoPlugin.Log.LogInfo($"Original 4-tabs width: {original4TabsWidth}");
-                PotatoPlugin.Log.LogInfo($"Current 5-tabs width: {current5TabsWidth}");
-                PotatoPlugin.Log.LogInfo($"Width increase: {widthIncrease}, Position offset: -{positionOffset}");
-                
-                // 调整容器X坐标 - 向左移(减去offset)
                 Vector2 currentPos = rectTransform.anchoredPosition;
-                rectTransform.anchoredPosition = new Vector2(
-                    currentPos.x - positionOffset,
-                    currentPos.y
-                );
+                rectTransform.anchoredPosition = new Vector2(currentPos.x - positionOffset, currentPos.y);
                 
-                PotatoPlugin.Log.LogInfo($"New position: {rectTransform.anchoredPosition}");
-                
-                // 确保padding为0,保持左对齐
                 horizontalLayout.padding.left = 0;
                 horizontalLayout.padding.right = 0;
                 horizontalLayout.childAlignment = TextAnchor.UpperLeft;
                 
-                // 再次强制刷新布局
                 LayoutRebuilder.ForceRebuildLayoutImmediate(rectTransform);
-                
-                PotatoPlugin.Log.LogInfo("Tab bar layout adjusted successfully!");
             }
             catch (System.Exception e)
             {
-                PotatoPlugin.Log.LogError($"Failed to adjust tab bar layout: {e.Message}\n{e.StackTrace}");
+                PotatoPlugin.Log.LogError($"调整标签栏布局失败: {e}");
             }
+        }
+        
+        static List<string> GetFunctionKeyOptions() => new List<string> 
+            { "F1", "F2", "F3", "F4", "F5", "F6", "F7", "F8", "F9", "F10", "F11", "F12" };
+        
+        static int GetKeyCodeIndex(KeyCode key)
+        {
+            int index = key - KeyCode.F1;
+            return index >= 0 && index < 12 ? index : 1;
+        }
+        
+        static KeyCode GetKeyCodeFromIndex(int index)
+        {
+            return index >= 0 && index < 12 ? KeyCode.F1 + index : KeyCode.F2;
+        }
+
+        /// <summary>
+        /// 创建游戏原生风格的下拉框(使用ModPulldownCloner)
+        /// </summary>
+        static void CreateNativeDropdown(Transform parent, string label, List<string> options, int currentIndex, System.Action<int> onValueChanged)
+        {
+            try
+            {
+                // 检查是否有缓存的SettingUI实例
+                if (cachedSettingUI == null)
+                {
+                    PotatoPlugin.Log.LogError($"cachedSettingUI 为 null,无法创建原生下拉框: {label}");
+                    return;
+                }
+
+                // 1. 克隆游戏原生下拉框(传入SettingUI的Transform)
+                GameObject pulldownClone = ModPulldownCloner.CloneAndClearPulldown(cachedSettingUI.transform);
+                if (pulldownClone == null)
+                {
+                    PotatoPlugin.Log.LogError($"克隆下拉框失败: {label}");
+                    return;
+                }
+
+                // 2. 获取按钮模板
+                GameObject buttonTemplate = ModPulldownCloner.GetSelectButtonTemplate(cachedSettingUI.transform);
+                if (buttonTemplate == null)
+                {
+                    PotatoPlugin.Log.LogError($"获取按钮模板失败: {label}");
+                    Object.Destroy(pulldownClone);
+                    return;
+                }
+
+                // 3. 修改下拉框的标题（如果存在Title组件）
+                TMP_Text titleText = pulldownClone.transform.Find("Title")?.GetComponent<TMP_Text>();
+                if (titleText != null)
+                {
+                    titleText.text = label;
+                    PotatoPlugin.Log.LogInfo($"设置下拉框标题: {label}");
+                }
+
+                // 4. 添加选项
+                for (int i = 0; i < options.Count; i++)
+                {
+                    int index = i;
+                    ModPulldownCloner.AddOption(pulldownClone, buttonTemplate, options[i], () =>
+                    {
+                        PotatoPlugin.Log.LogInfo($"选择了 {label}: {options[index]}");
+                        onValueChanged?.Invoke(index);
+                        
+                        // 更新下拉框顶部的显示文本
+                        SetPulldownSelectedText(pulldownClone, options[index]);
+                    });
+                }
+
+                // 5. 设置父物体为content
+                pulldownClone.transform.SetParent(parent, false);
+                
+                // 6. 设置默认选中项（在激活前）
+                if (currentIndex >= 0 && currentIndex < options.Count)
+                {
+                    SetPulldownSelectedText(pulldownClone, options[currentIndex]);
+                }
+                
+                // 7. 激活下拉框
+                pulldownClone.SetActive(true);
+
+                // 8. 清理模板
+                Object.Destroy(buttonTemplate);
+
+                PotatoPlugin.Log.LogInfo($"成功创建原生风格下拉框: {label}");
+            }
+            catch (System.Exception e)
+            {
+                PotatoPlugin.Log.LogError($"创建原生下拉框失败 [{label}]: {e}");
+            }
+        }
+
+        /// <summary>
+        /// 设置下拉框的当前选中项显示文本
+        /// 根据UnityExplorer截图: CurrentSelectText (TMP) 组件本身就是 TMP_Text
+        /// </summary>
+        static void SetPulldownSelectedText(GameObject pulldownClone, string text)
+        {
+            try
+            {
+                // ✅ 关键发现: CurrentSelectText (TMP) 本身就是一个 TMP_Text 组件!
+                Transform currentSelectTransform = pulldownClone.transform.Find("PulldownList/Pulldown/CurrentSelectText (TMP)");
+                if (currentSelectTransform != null)
+                {
+                    TMP_Text currentText = currentSelectTransform.GetComponent<TMP_Text>();
+                    if (currentText != null)
+                    {
+                        currentText.text = text;
+                        PotatoPlugin.Log.LogInfo($"✅ 设置选中项文本为: '{text}'");
+                        return;
+                    }
+                }
+
+                // 备用路径(以防万一)
+                string[] possiblePaths = new[]
+                {
+                    "SelectContent/Text (TMP)",
+                    "SelectContent/Text",
+                    "CurrentSelectText (TMP)",
+                    "CurrentSelectText",
+                    "Title/Text (TMP)",
+                    "Title/Text",
+                    "Text (TMP)"
+                };
+
+                TMP_Text selectText = null;
+                foreach (var path in possiblePaths)
+                {
+                    Transform target = pulldownClone.transform.Find(path);
+                    if (target != null)
+                    {
+                        selectText = target.GetComponent<TMP_Text>();
+                        if (selectText != null)
+                        {
+                            selectText.text = text;
+                            PotatoPlugin.Log.LogInfo($"✅ 设置选中项文本为: '{text}' (路径: {path})");
+                            return;
+                        }
+                    }
+                }
+
+                // 如果上面的路径都找不到,递归搜索所有TMP_Text组件
+                PotatoPlugin.Log.LogWarning($"未找到预期路径,尝试递归查找...");
+                var allTexts = pulldownClone.GetComponentsInChildren<TMP_Text>(true);
+                PotatoPlugin.Log.LogInfo($"找到 {allTexts.Length} 个TMP_Text组件:");
+                foreach (var tmpText in allTexts)
+                {
+                    string fullPath = GetFullPath(tmpText.transform, pulldownClone.transform);
+                    PotatoPlugin.Log.LogInfo($"  - {fullPath}");
+                    
+                    // 尝试通过名称判断是否是显示当前选中项的文本
+                    if (tmpText.name.Contains("CurrentSelectText") || 
+                        tmpText.name.Contains("SelectContent") ||
+                        tmpText.transform.parent?.name.Contains("CurrentSelectText") == true)
+                    {
+                        tmpText.text = text;
+                        PotatoPlugin.Log.LogInfo($"✅ 通过递归设置文本为: '{text}' (路径: {fullPath})");
+                        return;
+                    }
+                }
+
+                // 最后尝试使用反射调用PulldownListUI的方法
+                try
+                {
+                    var pulldownUI = pulldownClone.GetComponent(System.Type.GetType("Bulbul.PulldownListUI, Assembly-CSharp"));
+                    if (pulldownUI != null)
+                    {
+                        var method = pulldownUI.GetType().GetMethod("ChangeSelectContentText");
+                        if (method != null)
+                        {
+                            method.Invoke(pulldownUI, new object[] { text });
+                            PotatoPlugin.Log.LogInfo($"✅ 通过反射设置选中项文本为: '{text}'");
+                            return;
+                        }
+                    }
+                }
+                catch (System.Exception ex)
+                {
+                    PotatoPlugin.Log.LogWarning($"反射调用失败: {ex.Message}");
+                }
+
+                PotatoPlugin.Log.LogError($"❌ 所有方法都失败,无法设置选中项文本: '{text}'");
+            }
+            catch (System.Exception e)
+            {
+                PotatoPlugin.Log.LogError($"设置选中项文本时发生异常: {e}");
+            }
+        }
+
+        /// <summary>
+        /// 获取Transform的完整路径(用于调试)
+        /// </summary>
+        static string GetFullPath(Transform transform, Transform root)
+        {
+            if (transform == root) return transform.name;
+            
+            string path = transform.name;
+            Transform current = transform.parent;
+            
+            while (current != null && current != root)
+            {
+                path = current.name + "/" + path;
+                current = current.parent;
+            }
+            
+            return path;
+        }
+    }
+
+    /// <summary>
+    /// 协程运行器 - 用于延迟操作和异步UI更新
+    /// </summary>
+    public class ModUICoroutineRunner : MonoBehaviour
+    {
+        private static ModUICoroutineRunner _instance;
+        
+        public static ModUICoroutineRunner Instance
+        {
+            get
+            {
+                if (_instance == null)
+                {
+                    var go = new GameObject("ModUI_CoroutineRunner");
+                    DontDestroyOnLoad(go);
+                    _instance = go.AddComponent<ModUICoroutineRunner>();
+                }
+                return _instance;
+            }
+        }
+
+        /// <summary>
+        /// 延迟执行
+        /// </summary>
+        public void RunDelayed(float seconds, System.Action action)
+        {
+            StartCoroutine(DelayedAction(seconds, action));
+        }
+
+        private System.Collections.IEnumerator DelayedAction(float seconds, System.Action action)
+        {
+            yield return new WaitForSeconds(seconds);
+            action?.Invoke();
         }
     }
 }

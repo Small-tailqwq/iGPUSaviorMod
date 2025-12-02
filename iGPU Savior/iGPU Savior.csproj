@@ -87,6 +87,7 @@
 
   <ItemGroup>
     <Compile Include="Class1.cs" />
+    <Compile Include="ModPulldownCloner.cs" />
     <Compile Include="ModSettingsManager.cs" />
     <Compile Include="ModSettingsIntegration.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
