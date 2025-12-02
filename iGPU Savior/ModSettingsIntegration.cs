@@ -45,6 +45,7 @@ namespace PotatoOptimization
         private static GameObject modContentParent;
         private static InteractableUI modInteractableUI;
         private static SettingUI cachedSettingUI;
+        private static bool useGraphicsContent = false;
         
         // UI资源缓存
         private static TMP_FontAsset _cachedFont;
@@ -116,14 +117,28 @@ namespace PotatoOptimization
                     return;
                 }
 
-                var content = scrollRect.content;
+                                // �� Graphics ҳ Content ���������ȫһ�£����Է��?
+                Transform GraphicsContent = GetGraphicsContentTransform();
+                useGraphicsContent = GraphicsContent != null;
+                var content = useGraphicsContent ? GraphicsContent : scrollRect.content;
 
-                // 清空内容
-                foreach (Transform child in content)
+                // ���浱ǰͼ��ҳ������(ֻ�ռ���ǰֱ���Ӷ���)
+                if (useGraphicsContent && GraphicsOriginalChildren.Count == 0)
                 {
-                    Object.Destroy(child.gameObject);
+                    for (int i = 0; i < content.childCount; i++)
+                    {
+                        GraphicsOriginalChildren.Add(content.GetChild(i));
+                    }
                 }
 
+                // ֻ�� Mod ҳ�б���ʱ�Ŵ���ԭ���
+                if (!useGraphicsContent)
+                {
+                    foreach (Transform child in content)
+                    {
+                        Object.Destroy(child.gameObject);
+                    }
+                }
                 ConfigureContentLayout(content.gameObject);
 
                 // 创建管理器
@@ -235,14 +250,20 @@ namespace PotatoOptimization
                     return;
                 }
 
+                                // �� Graphics ҳ Content ���������ȫһ�£����Է��?
+                Transform GraphicsContent = GetGraphicsContentTransform();
+                useGraphicsContent = false;
                 var content = scrollRect.content;
 
-                // 清空旧内容
+                if (GraphicsContent != null)
+                {
+                    CopyLayoutFromGraphics(GraphicsContent, content);
+                }
+
                 foreach (Transform child in content)
                 {
                     Object.Destroy(child.gameObject);
                 }
-
                 PrepareUIResources();
 
                 // === ✅ 使用游戏原生风格构建 UI ===
@@ -324,10 +345,25 @@ namespace PotatoOptimization
                         PotatoPlugin.Log.LogInfo($"镜像快捷键: {PotatoPlugin.KeyCameraMirror.Value}");
                     });
 
-                LayoutRebuilder.ForceRebuildLayoutImmediate(content);
+                // �򿪺����±��㣬������Ŀ����Ǹ���Transform
+                var contentRect = content as RectTransform ?? content.GetComponent<RectTransform>();
+                if (contentRect != null)
+                {
+                    LayoutRebuilder.ForceRebuildLayoutImmediate(contentRect);
+                }
             });
         }
 
+        private static Transform GetGraphicsContentTransform()
+        {
+            if (cachedSettingUI == null) return null;
+            var t = cachedSettingUI.transform.Find("Graphics/ScrollView/Viewport/Content");
+            if (t == null)
+            {
+                PotatoPlugin.Log.LogWarning("δ�ҵ� Graphics/ScrollView/Viewport/Content, ����Modҳ�Զ��� layout");
+            }
+            return t;
+        }
         // ==================== UI组件构建方法 ====================
 
         static void CreateSectionHeader(Transform parent, string text)
@@ -810,7 +846,7 @@ namespace PotatoOptimization
         {
             yield return null;
             
-            if (modContentParent != null)
+            if (modContentParent != null && !useGraphicsContent)
             {
                 modContentParent.SetActive(false);
                 modInteractableUI?.DeactivateUseUI(false);
@@ -831,7 +867,8 @@ namespace PotatoOptimization
             var creditsParent = AccessTools.Field(typeof(SettingUI), "_creditsParent").GetValue(settingUI) as GameObject;
             
             generalParent?.SetActive(false);
-            graphicParent?.SetActive(false);
+            // �����ڵ���ͼ��ҳ�Ĳ���(������ͼ��ҳ�� Content)
+            graphicParent?.SetActive(useGraphicsContent);
             audioParent?.SetActive(false);
             creditsParent?.SetActive(false);
             
@@ -846,12 +883,21 @@ namespace PotatoOptimization
             creditsButton?.DeactivateUseUI(false);
             
             modInteractableUI?.ActivateUseUI(false);
-            modContentParent?.SetActive(true);
+            modContentParent?.SetActive(!useGraphicsContent);
             
-            var scrollRect = modContentParent?.GetComponentInChildren<ScrollRect>();
+            // ѡ�ѷ����ĸ���Ӧ�ø��´�����
+            ScrollRect scrollRect = null;
+            if (useGraphicsContent && graphicParent != null)
+            {
+                scrollRect = graphicParent.GetComponentInChildren<ScrollRect>();
+            }
+            else
+            {
+                scrollRect = modContentParent?.GetComponentInChildren<ScrollRect>();
+            }
             if (scrollRect != null)
             {
-                LayoutRebuilder.ForceRebuildLayoutImmediate(modContentParent.GetComponent<RectTransform>());
+                LayoutRebuilder.ForceRebuildLayoutImmediate(scrollRect.GetComponent<RectTransform>());
                 scrollRect.verticalNormalizedPosition = 1f;
             }
         }
@@ -1216,3 +1262,7 @@ namespace PotatoOptimization
         }
     }
 }
+
+
+
+
