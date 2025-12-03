@@ -3,6 +3,7 @@ using UnityEngine;
 using UnityEngine.UI;
 using Bulbul;
 using TMPro;
+using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using ModShared;
@@ -636,8 +637,6 @@ namespace PotatoOptimization
                     return;
                 }
 
-                pulldownClone.transform.SetParent(parent, false);
-
                 var rectTransform = pulldownClone.GetComponent<RectTransform>();
                 if (rectTransform != null)
                 {
@@ -661,7 +660,7 @@ namespace PotatoOptimization
                     return;
                 }
 
-                // Add all options first
+                // 添加选项
                 for (int i = 0; i < options.Count; i++)
                 {
                     int index = i;
@@ -672,48 +671,129 @@ namespace PotatoOptimization
                     });
                 }
 
+                // 设置默认选中项
                 if (currentIndex >= 0 && currentIndex < options.Count)
                 {
                     SetPulldownSelectedText(pulldownClone, options[currentIndex]);
                 }
 
-                // Force layout rebuild to get correct Content height
-                Canvas.ForceUpdateCanvases();
-                Transform content = pulldownClone.transform.Find("PulldownList/Pulldown/CurrentSelectText (TMP)/Content");
-                if (content != null)
-                {
-                    var contentRect = content.GetComponent<RectTransform>();
-                    if (contentRect != null)
-                    {
-                        LayoutRebuilder.ForceRebuildLayoutImmediate(contentRect);
-                    }
-                }
-
-                // NOW configure PulldownListUI with correct Content height
-                if (content != null)
-                {
-                    Transform originalPulldown = cachedSettingUI.transform.Find("Graphics/ScrollView/Viewport/Content/GraphicQualityPulldownList");
-                    ModPulldownCloner.EnsurePulldownListUI(pulldownClone, originalPulldown, content);
-                }
-
+                // 设置 LayoutElement
                 var layoutElement = pulldownClone.GetComponent<LayoutElement>() ?? pulldownClone.AddComponent<LayoutElement>();
                 layoutElement.preferredHeight = 72f;
 
+                // 挂载并激活
+                pulldownClone.transform.SetParent(parent, false);
                 pulldownClone.SetActive(true);
-                Canvas.ForceUpdateCanvases();
-                var parentRect = parent.GetComponent<RectTransform>();
-                if (parentRect != null) LayoutRebuilder.ForceRebuildLayoutImmediate(parentRect);
 
-                // Store dropdown reference for later closing
+                Transform content = pulldownClone.transform.Find("PulldownList/Pulldown/CurrentSelectText (TMP)/Content");
+                
+                Object.Destroy(buttonTemplate);
                 modDropdowns.Add(pulldownClone);
 
-                Object.Destroy(buttonTemplate);
+                // ========== 新方案：使用协程等待布局完成 ==========
+                ModUICoroutineRunner.Instance.StartCoroutine(WaitForLayoutAndConfigure(
+                    pulldownClone, 
+                    content, 
+                    label, 
+                    options, 
+                    currentIndex, 
+                    onValueChanged
+                ));
             }
             catch (System.Exception e)
             {
                 PotatoPlugin.Log.LogError($"CreateNativeDropdown failed [{label}]: {e}");
             }
         }
+
+        /// <summary>
+        /// 等待布局完成后再配置下拉菜单
+        /// </summary>
+        private static IEnumerator WaitForLayoutAndConfigure(
+            GameObject pulldownClone, 
+            Transform content, 
+            string label,
+            List<string> options,
+            int currentIndex,
+            System.Action<int> onValueChanged)
+        {
+            if (pulldownClone == null || content == null) yield break;
+            
+            var contentRect = content.GetComponent<RectTransform>();
+            if (contentRect == null) yield break;
+            
+            // 第一步：强制重建布局
+            LayoutRebuilder.ForceRebuildLayoutImmediate(contentRect);
+            Canvas.ForceUpdateCanvases();
+            
+            // 第二步：等待 Unity 完成一帧渲染
+            yield return new WaitForEndOfFrame();
+            
+            // 第三步：再次强制重建（确保所有组件都更新）
+            LayoutRebuilder.ForceRebuildLayoutImmediate(contentRect);
+            
+            // 第四步：等待下一帧（此时 sizeDelta 应该是正确的）
+            yield return new WaitForEndOfFrame();
+            
+            // 第五步：读取 Content 的实际高度
+            float contentHeight = contentRect.sizeDelta.y;
+            PotatoPlugin.Log.LogInfo($"[{label}] Content height after layout: {contentHeight}");
+            
+            // 如果高度仍然不正确（< 40），手动计算
+            if (contentHeight < 40f)
+            {
+                int buttonCount = content.childCount;
+                contentHeight = buttonCount * 40f; // 每个按钮 40px
+                PotatoPlugin.Log.LogWarning($"[{label}] Layout failed, using calculated height: {contentHeight} ({buttonCount} buttons)");
+            }
+            
+            // 配置下拉菜单
+            Transform originalPulldown = cachedSettingUI.transform.Find("Graphics/ScrollView/Viewport/Content/GraphicQualityPulldownList");
+            ModPulldownCloner.EnsurePulldownListUI(
+                pulldownClone, 
+                originalPulldown, 
+                content,
+                contentHeight // 传递正确的高度
+            );
+            
+            // ========== 修复：不再调用 ConfigureDropdownCanvas，避免销毁 Canvas A ==========
+            // ConfigureDropdownCanvas(pulldownClone, label); // 删除！这会销毁 Controller 持有的 Canvas 引用
+        }
+
+        /* ========== 已删除：此方法会销毁 PulldownLayerController 持有的 Canvas 引用 ==========
+        /// <summary>
+        /// 配置下拉菜单的 Canvas（解决层级冲突）
+        /// </summary>
+        private static void ConfigureDropdownCanvas(GameObject pulldownClone, string label)
+        {
+            Transform pulldownList = pulldownClone.transform.Find("PulldownList");
+            if (pulldownList == null)
+            {
+                PotatoPlugin.Log.LogError($"[{label}] PulldownList not found!");
+                return;
+            }
+            
+            // 移除旧的 Canvas
+            Canvas oldCanvas = pulldownList.GetComponent<Canvas>();
+            if (oldCanvas != null)
+            {
+                Object.Destroy(oldCanvas);
+            }
+            
+            // 添加新的 Canvas
+            Canvas dropdownCanvas = pulldownList.gameObject.AddComponent<Canvas>();
+            dropdownCanvas.overrideSorting = true;
+            dropdownCanvas.sortingOrder = 1000; // 提高到 1000，确保在最上层
+            
+            // 添加 GraphicRaycaster
+            if (pulldownList.GetComponent<GraphicRaycaster>() == null)
+            {
+                pulldownList.gameObject.AddComponent<GraphicRaycaster>();
+            }
+            
+            PotatoPlugin.Log.LogInfo($"[{label}] Canvas configured with sortingOrder=1000");
+        }
+        */
 
         static void SetPulldownSelectedText(GameObject pulldownClone, string text)
         {

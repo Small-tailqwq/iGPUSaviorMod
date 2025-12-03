@@ -11,6 +11,14 @@ namespace PotatoOptimization
     /// </summary>
     public class ModPulldownCloner
     {
+        // === 核心修复 1：通用类型获取方法 (防止 Type cannot be null) ===
+        private static Type GetPulldownUIType()
+        {
+            return Type.GetType("Bulbul.PulldownListUI, Assembly-CSharp")
+                ?? Type.GetType("PulldownListUI, Assembly-CSharp")
+                ?? Type.GetType("PulldownListUI");
+        }
+
         /// <summary>
         /// Clone the game's GraphicQualityPulldownList and clear its options
         /// Returns a ready-to-use empty pulldown GameObject
@@ -134,10 +142,6 @@ namespace PotatoOptimization
         /// <summary>
         /// Add an option to the pulldown
         /// </summary>
-        /// <param name="pulldownClone">The cloned pulldown GameObject</param>
-        /// <param name="buttonTemplate">Button template from GetSelectButtonTemplate()</param>
-        /// <param name="optionText">Display text for this option</param>
-        /// <param name="onClick">Callback when option is clicked</param>
         public static void AddOption(GameObject pulldownClone, GameObject buttonTemplate, string optionText, Action onClick)
         {
             try
@@ -178,28 +182,34 @@ namespace PotatoOptimization
                     {
                         PotatoPlugin.Log.LogInfo($"Option clicked: {optionText}");
                         
-                        // Update pulldown's displayed text and close dropdown via reflection
+                        // === 修复点：使用通用方法获取类型，不再写死字符串 ===
                         try
                         {
-                            var pulldownUI = pulldownClone.GetComponent(Type.GetType("Bulbul.PulldownListUI, Assembly-CSharp"));
-                            if (pulldownUI != null)
+                            Type pulldownType = GetPulldownUIType(); // <--- 使用新方法
+                            if (pulldownType != null)
                             {
-                                var pulldownType = pulldownUI.GetType();
-                                
-                                // Update selected text
-                                var changeTextMethod = pulldownType.GetMethod("ChangeSelectContentText");
-                                if (changeTextMethod != null)
+                                // 尝试在自身或子物体查找组件
+                                var pulldownUI = pulldownClone.GetComponent(pulldownType);
+                                if (pulldownUI == null) 
+                                    pulldownUI = pulldownClone.GetComponentInChildren(pulldownType);
+
+                                if (pulldownUI != null)
                                 {
-                                    changeTextMethod.Invoke(pulldownUI, new object[] { optionText });
-                                    PotatoPlugin.Log.LogInfo($"Updated selected text to: {optionText}");
-                                }
-                                
-                                // Close the pulldown (same as native behavior)
-                                var closePullDownMethod = pulldownType.GetMethod("ClosePullDown");
-                                if (closePullDownMethod != null)
-                                {
-                                    closePullDownMethod.Invoke(pulldownUI, new object[] { false }); // false = with animation
-                                    PotatoPlugin.Log.LogInfo("Dropdown closed via ClosePullDown()");
+                                    // Update selected text
+                                    var changeTextMethod = pulldownType.GetMethod("ChangeSelectContentText", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
+                                    if (changeTextMethod != null)
+                                    {
+                                        changeTextMethod.Invoke(pulldownUI, new object[] { optionText });
+                                        PotatoPlugin.Log.LogInfo($"Updated selected text to: {optionText}");
+                                    }
+                                    
+                                    // Close the pulldown
+                                    var closePullDownMethod = pulldownType.GetMethod("ClosePullDown", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
+                                    if (closePullDownMethod != null)
+                                    {
+                                        closePullDownMethod.Invoke(pulldownUI, new object[] { false }); 
+                                        PotatoPlugin.Log.LogInfo("Dropdown closed via ClosePullDown()");
+                                    }
                                 }
                             }
                         }
@@ -212,24 +222,13 @@ namespace PotatoOptimization
                         onClick?.Invoke();
                     });
 
-                    // Ensure button is interactable
-                    if (!button.interactable)
-                    {
-                        button.interactable = true;
-                    }
+                    if (!button.interactable) button.interactable = true;
                     
-                    // Ensure button's target graphic is set
                     if (button.targetGraphic == null)
                     {
                         var graphic = newButton.GetComponent<UnityEngine.UI.Image>();
                         if (graphic != null) button.targetGraphic = graphic;
                     }
-                    
-                    PotatoPlugin.Log.LogInfo($"Option button '{optionText}' configured successfully, interactable={button.interactable}, hasTargetGraphic={button.targetGraphic != null}");
-                }
-                else
-                {
-                    PotatoPlugin.Log.LogError($"Button '{optionText}' has no Button component");
                 }
             }
             catch (Exception e)
@@ -238,30 +237,16 @@ namespace PotatoOptimization
             }
         }
 
-        /// <summary>
-        /// Mount the pulldown to a parent in the settings UI
-        /// </summary>
         public static void MountPulldown(GameObject pulldownClone, string parentPath)
         {
             try
             {
-                // Find the settings root
                 GameObject settingRoot = GameObject.Find("UI_FacilitySetting");
-                if (settingRoot == null)
-                {
-                    PotatoPlugin.Log.LogError("UI_FacilitySetting not found");
-                    return;
-                }
+                if (settingRoot == null) return;
 
-                // Find the target parent
                 Transform parent = settingRoot.transform.Find(parentPath);
-                if (parent == null)
-                {
-                    PotatoPlugin.Log.LogError($"Parent path not found: {parentPath}");
-                    return;
-                }
+                if (parent == null) return;
 
-                // Mount and activate
                 pulldownClone.transform.SetParent(parent, false);
                 pulldownClone.SetActive(true);
             }
@@ -272,111 +257,51 @@ namespace PotatoOptimization
         }
 
         /// <summary>
-        /// Play the game's native click sound
-        /// </summary>
-        private static void PlayClickSound()
-        {
-            try
-            {
-                var settingUI = UnityEngine.Object.FindObjectOfType(Type.GetType("Bulbul.SettingUI, Assembly-CSharp"));
-                if (settingUI != null)
-                {
-                    var systemSeServiceField = settingUI.GetType().GetField("_systemSeService",
-                        BindingFlags.NonPublic | BindingFlags.Instance);
-
-                    if (systemSeServiceField != null)
-                    {
-                        var systemSeService = systemSeServiceField.GetValue(settingUI);
-                        if (systemSeService != null)
-                        {
-                            var playClickMethod = systemSeService.GetType().GetMethod("PlayClick");
-                            playClickMethod?.Invoke(systemSeService, null);
-                        }
-                    }
-                }
-            }
-            catch (Exception e)
-            {
-                PotatoPlugin.Log.LogWarning($"Failed to play click sound: {e.Message}");
-            }
-        }
-
-        /// <summary>
         /// Ensure the PulldownListUI component is properly configured on the cloned pulldown
-        /// This recreates the setup that the game does natively for its pulldowns
         /// </summary>
-        public static void EnsurePulldownListUI(GameObject clone, Transform originalPath, Transform content)
+        public static void EnsurePulldownListUI(GameObject clone, Transform originalPath, Transform content, float manualContentHeight = -1f)
         {
             try
             {
-                // Get PulldownListUI type via reflection (try multiple names)
-                Type pulldownUIType = Type.GetType("Bulbul.PulldownListUI, Assembly-CSharp")
-                    ?? Type.GetType("PulldownListUI, Assembly-CSharp")
-                    ?? Type.GetType("PulldownListUI");
+                // 1. 获取类型 (使用通用方法)
+                Type pulldownUIType = GetPulldownUIType();
                 if (pulldownUIType == null)
                 {
-                    PotatoPlugin.Log.LogError("PulldownListUI type not found (Assembly-CSharp)");
+                    PotatoPlugin.Log.LogError("PulldownListUI type not found");
                     return;
                 }
 
-                // Find key transforms
+                // 2. 找到关键节点
                 Transform pulldownList = clone.transform.Find("PulldownList");
                 Transform pulldown = clone.transform.Find("PulldownList/Pulldown");
                 Transform pulldownButton = clone.transform.Find("PulldownList/PulldownButton");
                 Transform currentSelectText = clone.transform.Find("PulldownList/Pulldown/CurrentSelectText (TMP)");
 
-                // Get or add PulldownListUI component
-                Component pulldownUI = (pulldownList != null) 
-                    ? pulldownList.GetComponent(pulldownUIType) 
-                    : clone.GetComponent(pulldownUIType);
-                    
-                if (pulldownUI == null)
-                {
-                    GameObject attachTarget = (pulldownList != null) ? pulldownList.gameObject : clone;
-                    pulldownUI = attachTarget.AddComponent(pulldownUIType);
-                }
+                // 3. 挂载 PulldownListUI 脚本
+                GameObject uiHost = (pulldownList != null) ? pulldownList.gameObject : clone;
+                Component pulldownUI = uiHost.GetComponent(pulldownUIType);
+                if (pulldownUI == null) pulldownUI = uiHost.AddComponent(pulldownUIType);
 
-                // Get required components
-                Button pulldownButtonComp = pulldownButton != null ? pulldownButton.GetComponent<Button>() : null;
-                TMP_Text currentSelectTextComp = currentSelectText != null ? currentSelectText.GetComponent<TMP_Text>() : null;
-                RectTransform pulldownParentRect = pulldown != null ? pulldown.GetComponent<RectTransform>() : null;
-                RectTransform pulldownButtonRect = pulldownButton != null ? pulldownButton.GetComponent<RectTransform>() : null;
-                RectTransform contentRect = content != null ? content.GetComponent<RectTransform>() : null;
-                Canvas canvas = clone.GetComponentInParent<Canvas>();
+                // 4. 获取必要的组件引用
+                Button pulldownButtonComp = pulldownButton?.GetComponent<Button>();
+                TMP_Text currentSelectTextComp = currentSelectText?.GetComponent<TMP_Text>();
+                RectTransform pulldownParentRect = pulldown?.GetComponent<RectTransform>();
+                RectTransform pulldownButtonRect = pulldownButton?.GetComponent<RectTransform>();
+                RectTransform contentRect = content?.GetComponent<RectTransform>();
 
-                // Check if all required components are present
-                bool ready = pulldownButtonComp != null 
-                    && currentSelectTextComp != null 
-                    && pulldownParentRect != null 
-                    && pulldownButtonRect != null 
-                    && canvas != null;
-                    
-                if (!ready)
-                {
-                    PotatoPlugin.Log.LogWarning($"PulldownListUI init skipped: pulldownButton={pulldownButtonComp != null}, currentSelectText={currentSelectTextComp != null}, pulldownRect={pulldownParentRect != null}, buttonRect={pulldownButtonRect != null}, canvas={canvas != null}");
-                    return;
-                }
+                if (pulldownButtonComp == null || currentSelectTextComp == null || pulldownParentRect == null) return;
 
-                // Helper to set private fields via reflection
-                void SetField(string fieldName, object value)
-                {
+                // 5. 反射辅助方法
+                void SetField(string fieldName, object value) {
                     if (value == null) return;
-                    FieldInfo field = pulldownUIType.GetField(fieldName, BindingFlags.NonPublic | BindingFlags.Instance);
-                    field?.SetValue(pulldownUI, value);
+                    pulldownUIType.GetField(fieldName, BindingFlags.NonPublic | BindingFlags.Instance)?.SetValue(pulldownUI, value);
                 }
 
-                // Calculate open size (same logic as game's native pulldowns)
-                float closeHeight = pulldownParentRect.rect.height;
-                float contentHeight = contentRect != null ? contentRect.rect.height : 0f;
+                // 6. 计算高度和处理滚动 (ScrollRect)
+                float contentHeight = (manualContentHeight > 0) ? manualContentHeight : (contentRect != null ? contentRect.sizeDelta.y : 200f);
+                float openSize = pulldownParentRect.rect.height + contentHeight + 20f;
                 
-                // Limit content height and add scrolling if needed (max 6 options visible)
-                float maxContentHeight = 240f; // About 6 options at 40px each
-                bool needsScrolling = contentHeight > maxContentHeight;
-                float visibleContentHeight = needsScrolling ? maxContentHeight : contentHeight;
-                float openSize = closeHeight + visibleContentHeight + 20f; // +20 for padding
-                
-                // Add ScrollRect to Content if it has many options
-                if (needsScrolling && contentRect != null)
+                if (contentHeight > 240f && contentRect != null)
                 {
                     var scrollRect = content.GetComponent<ScrollRect>();
                     if (scrollRect == null)
@@ -387,124 +312,75 @@ namespace PotatoOptimization
                         scrollRect.scrollSensitivity = 20f;
                         scrollRect.movementType = ScrollRect.MovementType.Clamped;
                         
-                        // Create viewport for scrolling
                         var viewport = new GameObject("Viewport");
                         viewport.transform.SetParent(content, false);
                         var viewportRect = viewport.AddComponent<RectTransform>();
-                        viewportRect.anchorMin = Vector2.zero;
-                        viewportRect.anchorMax = Vector2.one;
-                        viewportRect.sizeDelta = Vector2.zero;
+                        viewportRect.anchorMin = Vector2.zero; viewportRect.anchorMax = Vector2.one; viewportRect.sizeDelta = Vector2.zero;
                         viewport.AddComponent<RectMask2D>();
                         
                         scrollRect.viewport = viewportRect;
                         scrollRect.content = contentRect;
                         
-                        // Resize content to enable scrolling
-                        contentRect.sizeDelta = new UnityEngine.Vector2(contentRect.sizeDelta.x, contentHeight);
+                        contentRect.sizeDelta = new Vector2(contentRect.sizeDelta.x, contentHeight);
+                    }
+                    openSize = pulldownParentRect.rect.height + 240f + 20f; 
+                }
+
+                if (contentRect != null) {
+                    contentRect.anchorMin = Vector2.zero; 
+                    contentRect.anchorMax = new Vector2(1f, 0f);
+                    contentRect.pivot = new Vector2(0.5f, 1f); 
+                    contentRect.anchoredPosition = Vector2.zero;
+                }
+
+                // =========================================================================
+                // 🔥 关键修复：把 Canvas 加在【clone 根节点】上 🔥
+                // =========================================================================
+                // 这样整个组件（包括标题栏和列表）都会在展开时提升层级，不会被下方按钮遮挡
+                
+                Canvas rootCanvas = clone.GetComponent<Canvas>();
+                if (rootCanvas == null)
+                {
+                    rootCanvas = clone.AddComponent<Canvas>();
+                    // 默认关闭 overrideSorting，等展开时再开启，防止关闭状态下的层级异常
+                    rootCanvas.overrideSorting = false;
+                    rootCanvas.sortingOrder = 0; 
+                    
+                    // 必须加 Raycaster，否则有了 Canvas 后鼠标点击会失效
+                    if (clone.GetComponent<GraphicRaycaster>() == null)
+                        clone.AddComponent<GraphicRaycaster>();
                         
-                        PotatoPlugin.Log.LogInfo($"Added ScrollRect to Content: {contentHeight}px content in {maxContentHeight}px viewport");
-                    }
+                    PotatoPlugin.Log.LogInfo("✅ Canvas added to ROOT object (ModPulldownList)");
                 }
                 
-                // Position Content correctly - it should overflow parent bounds when Pulldown expands
-                // Content is child of CurrentSelectText (TMP), not Pulldown
-                if (contentRect != null)
-                {
-                    // Check parent hierarchy
-                    Transform contentParent = content.parent;
-                    string parentName = contentParent != null ? contentParent.name : "null";
-                    PotatoPlugin.Log.LogInfo($"Content parent: {parentName}");
-                    
-                    // Set Content to anchor at bottom of its parent (CurrentSelectText)
-                    // with Overflow enabled so it appears below when Pulldown expands
-                    contentRect.anchorMin = new UnityEngine.Vector2(0f, 0f);
-                    contentRect.anchorMax = new UnityEngine.Vector2(1f, 0f);
-                    contentRect.pivot = new UnityEngine.Vector2(0.5f, 1f); // Pivot at top
-                    contentRect.anchoredPosition = new UnityEngine.Vector2(0f, 0f);
-                    
-                    // Ensure Overflow is enabled on parent (not clipped)
-                    var parentImage = contentParent?.GetComponent<UnityEngine.UI.Image>();
-                    if (parentImage != null)
-                    {
-                        // Check if parent has RectMask2D (which would clip content)
-                        var parentMask = contentParent.GetComponent<RectMask2D>();
-                        if (parentMask != null)
-                        {
-                            PotatoPlugin.Log.LogWarning($"Parent {parentName} has RectMask2D which may clip Content");
-                        }
-                    }
-                    
-                    PotatoPlugin.Log.LogInfo($"Content positioned: anchor=({contentRect.anchorMin}, {contentRect.anchorMax}), pivot={contentRect.pivot}, pos={contentRect.anchoredPosition}");
+                // 🧹 清理子物体上可能残留的 Canvas (防止打架)
+                if (pulldown != null) {
+                    var childCanvas = pulldown.GetComponent<Canvas>();
+                    if (childCanvas != null) UnityEngine.Object.Destroy(childCanvas);
                 }
-                else
-                {
-                    PotatoPlugin.Log.LogWarning("contentRect is null, cannot position Content");
+                if (pulldownList != null) {
+                    var childCanvas = pulldownList.GetComponent<Canvas>();
+                    if (childCanvas != null) UnityEngine.Object.Destroy(childCanvas);
                 }
-                
-                PotatoPlugin.Log.LogInfo($"Pulldown sizes - Close: {closeHeight}, Content: {contentHeight}, Open: {openSize}, Scrolling: {needsScrolling}");
 
-                // Add Canvas to Pulldown for layer control (brings dropdown above scroll bar)
-                Canvas pulldownCanvas = pulldown.GetComponent<Canvas>();
-                if (pulldownCanvas == null)
-                {
-                    pulldownCanvas = pulldown.gameObject.AddComponent<Canvas>();
-                    pulldownCanvas.overrideSorting = true;
-                    pulldownCanvas.sortingOrder = -1; // Below other UI when closed (will be 1000 when open)
-                    
-                    // Add GraphicRaycaster for proper click detection
-                    pulldown.gameObject.AddComponent<GraphicRaycaster>();
-                    PotatoPlugin.Log.LogInfo("Added Canvas to Pulldown (initial sortingOrder=-1)");
-                }
+                // 7. 初始化层级控制器 (传入根 Canvas)
+                var layerController = clone.GetComponent<PulldownLayerController>();
+                if (layerController == null) layerController = clone.AddComponent<PulldownLayerController>();
                 
-                // Add helper component to control Canvas sorting order based on _isOpen
-                // Attach to clone root so it's always active (not affected by pulldown open/close)
-                var layerController = clone.AddComponent<PulldownLayerController>();
-                layerController.Initialize(pulldownUI, pulldownCanvas);
+                // 只要这个 Initialize 被调用，Controller 就会接管 sortingOrder
+                layerController.Initialize(pulldownUI, rootCanvas);
 
-                // Set private fields (mimicking game's setup)
+                // 8. 继续反射赋值
                 SetField("_currentSelectContentText", currentSelectTextComp);
                 SetField("_pullDownParentRect", pulldownParentRect);
                 SetField("_openPullDownSizeDeltaY", openSize);
                 SetField("_pullDownOpenCloseSeconds", 0.3f);
-                // Set Ease.OutCubic (enum value = 6) via reflection
-                Type easeType = Type.GetType("DG.Tweening.Ease, DOTween");
-                if (easeType != null) SetField("_pullDownOpenCloseEase", Enum.ToObject(easeType, 6)); // 6 = OutCubic
                 SetField("_pullDownOpenButton", pulldownButtonComp);
                 SetField("_pullDownButtonRect", pulldownButtonRect);
-                // Initialize _isOpen to false (closed state)
                 SetField("_isOpen", false);
-                SetField("_closePullDownSizeDeltaY", 0f); // Will be set by Setup()
-                
-                PotatoPlugin.Log.LogInfo("All PulldownListUI fields configured via reflection");
 
-                // Call Setup() method (same as game does in SettingUI.Setup())
-                // This binds the button onClick to TogglePullDown() which handles DOTween animations
-                MethodInfo setupMethod = pulldownUIType.GetMethod("Setup", BindingFlags.Public | BindingFlags.Instance);
-                if (setupMethod != null)
-                {
-                    setupMethod.Invoke(pulldownUI, null);
-                    
-                    // Verify setup results
-                    FieldInfo isOpenField = pulldownUIType.GetField("_isOpen", BindingFlags.NonPublic | BindingFlags.Instance);
-                    FieldInfo closeHeightField = pulldownUIType.GetField("_closePullDownSizeDeltaY", BindingFlags.NonPublic | BindingFlags.Instance);
-                    bool isOpen = isOpenField != null ? (bool)isOpenField.GetValue(pulldownUI) : false;
-                    float actualCloseHeight = closeHeightField != null ? (float)closeHeightField.GetValue(pulldownUI) : 0f;
-                    
-                    PotatoPlugin.Log.LogInfo($"PulldownListUI.Setup() invoked - _isOpen={isOpen}, _closePullDownSizeDeltaY={actualCloseHeight}");
-                    
-                    // Check if MonoBehaviour Update will run
-                    MonoBehaviour mb = pulldownUI as MonoBehaviour;
-                    if (mb != null)
-                    {
-                        PotatoPlugin.Log.LogInfo($"PulldownListUI MonoBehaviour - enabled={mb.enabled}, active={mb.gameObject.activeInHierarchy}");
-                    }
-                }
-                else
-                {
-                    PotatoPlugin.Log.LogWarning("Setup() method not found on PulldownListUI");
-                }
-                
-                PotatoPlugin.Log.LogInfo("PulldownListUI component configured successfully");
+                // 9. 调用原版 Setup 方法
+                pulldownUIType.GetMethod("Setup")?.Invoke(pulldownUI, null);
             }
             catch (Exception e)
             {
@@ -523,6 +399,7 @@ namespace PotatoOptimization
         private Canvas targetCanvas;
         private FieldInfo isOpenField;
         private bool lastIsOpen = false;
+        private bool isInitialized = false;
 
         public void Initialize(Component pulldownUIComponent, Canvas canvas)
         {
@@ -532,12 +409,17 @@ namespace PotatoOptimization
             if (pulldownUI != null)
             {
                 isOpenField = pulldownUI.GetType().GetField("_isOpen", BindingFlags.NonPublic | BindingFlags.Instance);
+                isInitialized = true;
+                
+                // 强制刷新一次状态
+                UpdateSortingOrder(false);
+                PotatoPlugin.Log.LogInfo("PulldownLayerController initialized successfully");
             }
         }
 
         private void Update()
         {
-            if (pulldownUI == null || targetCanvas == null || isOpenField == null) return;
+            if (!isInitialized || pulldownUI == null || targetCanvas == null || isOpenField == null) return;
 
             try
             {
@@ -546,16 +428,36 @@ namespace PotatoOptimization
                 // Only update when state changes to reduce overhead
                 if (isOpen != lastIsOpen)
                 {
-                    // Bring to front when open, hide below when closed
-                    targetCanvas.sortingOrder = isOpen ? 1000 : -1;
+                    UpdateSortingOrder(isOpen);
                     lastIsOpen = isOpen;
-                    PotatoPlugin.Log.LogInfo($"Dropdown layer changed: isOpen={isOpen}, sortingOrder={targetCanvas.sortingOrder}");
                 }
             }
             catch
             {
                 // Ignore errors silently
             }
+        }
+
+        private void UpdateSortingOrder(bool isOpen)
+        {
+            if (targetCanvas == null) return;
+
+            // ========== 优化修复：开关 overrideSorting ==========
+            // 展开时：开启 overrideSorting 并设置为 30000，确保盖住所有东西
+            // 收起时：关闭 overrideSorting，让它回归父级 Layout 的自然层级，避免关闭时出现遮挡异常
+            
+            if (isOpen)
+            {
+                targetCanvas.overrideSorting = true;
+                targetCanvas.sortingOrder = 30000;
+            }
+            else
+            {
+                targetCanvas.overrideSorting = false;
+                targetCanvas.sortingOrder = 0;
+            }
+            
+            // PotatoPlugin.Log.LogInfo($"Dropdown layer changed: isOpen={isOpen}, override={targetCanvas.overrideSorting}");
         }
     }
 }
