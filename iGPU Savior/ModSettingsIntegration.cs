@@ -212,22 +212,27 @@ namespace PotatoOptimization
 
                 // CreateSectionHeader(content, "Basic Settings"); // Removed - causes text clipping outside viewport
 
-                GameObject mirrorToggle = ModToggleCloner.CreateToggleGroup(
+                // ========== 使用新的 ModToggleCloner 创建开关 ==========
+                GameObject mirrorToggle = ModToggleCloner.CreateToggle(
                     cachedSettingUI.transform,
-                    "Enable Mirror",
-                    PotatoPlugin.CfgEnableMirror.Value,
+                    "Enable Mirror", // 标题
+                    PotatoPlugin.CfgEnableMirror.Value, // 初始值
                     val =>
                     {
                         PotatoPlugin.CfgEnableMirror.Value = val;
+                        // 实时应用设置
                         var controller = Object.FindObjectOfType<PotatoController>();
                         controller?.SetMirrorState(val);
+                        PotatoPlugin.Log.LogInfo($"Mirror toggled: {val}");
                     }
                 );
+                
                 if (mirrorToggle != null)
                 {
                     mirrorToggle.transform.SetParent(content, false);
                     mirrorToggle.SetActive(true);
                 }
+                // ===================================================
 
                 CreateNativeDropdown(content, "Window Scale",
                     new List<string> { "1/3 Size", "1/4 Size", "1/5 Size" },

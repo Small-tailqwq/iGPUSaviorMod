@@ -4,11 +4,14 @@ using BepInEx.Logging;
 using HarmonyLib;
 using System;
 using System.Collections;
+using System.Collections.Generic;
 using System.Reflection;
 using System.Runtime.InteropServices;
 using UnityEngine;
+using UnityEngine.EventSystems;
 using UnityEngine.Rendering;
 using UnityEngine.SceneManagement;
+using UnityEngine.UI;
 
 namespace PotatoOptimization
 {
@@ -102,6 +105,15 @@ namespace PotatoOptimization
         private bool isSmallWindow = false;
         private bool isCameraMirrored = false; // 新增：镜像状态
 
+        // === 镜像模式相关 ===
+        private RenderTexture mirrorRenderTexture;
+        private GameObject mirrorCanvas;
+        private RawImage mirrorRawImage;
+        private Material mirrorFlipMaterial;
+        private int lastScreenWidth;
+        private int lastScreenHeight;
+        private AudioChannelSwapper audioSwapper; // 音频声道交换组件
+
         private float targetRenderScale = 0.4f;
         private int currentTargetWidth;
         private int currentTargetHeight;
@@ -190,6 +202,9 @@ namespace PotatoOptimization
         private Vector2 dragStartWindowPos;
         private bool isRightDragging = false;
 
+        // === 镜像模式输入标志 ===
+        public static bool isInputMirrored = false;
+
         void Start()
         {
             SceneManager.sceneLoaded += OnSceneLoaded;
@@ -202,6 +217,10 @@ namespace PotatoOptimization
             // ✨ 获取当前窗口样式 (带边框/不带边框)
             IntPtr hWnd = GetActiveWindow();
             origStyle = GetWindowLong(hWnd, GWL_STYLE);
+
+            // 初始化分辨率跟踪
+            lastScreenWidth = Screen.width;
+            lastScreenHeight = Screen.height;
 
             // 根据配置决定是否启动时启用镜像
             if (PotatoPlugin.CfgEnableMirror.Value)
@@ -237,6 +256,12 @@ namespace PotatoOptimization
                 ToggleCameraMirror();
             }
 
+            // ✨ 检测分辨率变化（镜像模式下）
+            if (isCameraMirrored)
+            {
+                CheckAndHandleResolutionChange();
+            }
+
             if (isSmallWindow)
             {
                 HandleDragLogic();
@@ -249,6 +274,56 @@ namespace PotatoOptimization
                     ApplyPotatoMode(false);
                     lastRunTime = Time.realtimeSinceStartup;
                 }
+            }
+        }
+
+        // === ✨ 分辨率变化检测 ===
+        private void CheckAndHandleResolutionChange()
+        {
+            if (Screen.width != lastScreenWidth || Screen.height != lastScreenHeight)
+            {
+                PotatoPlugin.Log.LogInfo($"检测到分辨率变化: {lastScreenWidth}x{lastScreenHeight} -> {Screen.width}x{Screen.height}");
+                
+                lastScreenWidth = Screen.width;
+                lastScreenHeight = Screen.height;
+
+                // 重建 RenderTexture
+                RecreateRenderTexture();
+            }
+        }
+
+        private void RecreateRenderTexture()
+        {
+            if (!isCameraMirrored || mirrorRenderTexture == null)
+                return;
+
+            try
+            {
+                Camera mainCam = Camera.main;
+                if (mainCam == null)
+                    return;
+
+                // 1. 暂时断开摄像机
+                mainCam.targetTexture = null;
+
+                // 2. 释放旧 RT
+                mirrorRenderTexture.Release();
+
+                // 3. 创建新 RT
+                mirrorRenderTexture = CreateMirrorRenderTexture();
+
+                // 4. 重新连接
+                mainCam.targetTexture = mirrorRenderTexture;
+                if (mirrorRawImage != null)
+                {
+                    mirrorRawImage.texture = mirrorRenderTexture;
+                }
+
+                PotatoPlugin.Log.LogInfo("已重建 RenderTexture，适应新分辨率");
+            }
+            catch (Exception e)
+            {
+                PotatoPlugin.Log.LogError($"重建 RenderTexture 失败: {e.Message}");
             }
         }
 
@@ -313,53 +388,221 @@ namespace PotatoOptimization
             ApplyCameraMirror();
         }
 
-        // ✅ 改进后的镜像实现：使用投影矩阵而非Transform缩放
+        // ✅ 修复后的镜像实现：使用 RenderTexture + UV 翻转，而非投影矩阵
         // ✅ 改为 public，允许从 ModSettingsIntegration 调用
         public void ApplyCameraMirror()
         {
-            Camera[] allCameras = Camera.allCameras;
-            
-            if (allCameras == null || allCameras.Length == 0)
-            {
-                PotatoPlugin.Log.LogWarning(">>> 未找到任何摄像机，跳过镜像 <<<");
-                return;
-            }
-
-            int mirroredCount = 0;
-
-            foreach (Camera cam in allCameras)
-            {
-                if (cam != null)
-                {
-                    // ✅ 关键修复：使用投影矩阵翻转，而不是 Transform.scale
-                    if (isCameraMirrored)
-                    {
-                        // 创建一个水平翻转的投影矩阵
-                        Matrix4x4 mat = cam.projectionMatrix;
-                        mat *= Matrix4x4.Scale(new Vector3(-1, 1, 1)); // 只翻转 X 轴
-                        cam.projectionMatrix = mat;
-                        
-                        // 反转剔除模式（重要！否则模型会消失）
-                        cam.ResetWorldToCameraMatrix();
-                    }
-                    else
-                    {
-                        // 恢复默认投影矩阵
-                        cam.ResetProjectionMatrix();
-                        cam.ResetWorldToCameraMatrix();
-                    }
-                    
-                    mirroredCount++;
-                }
-            }
-
             if (isCameraMirrored)
             {
-                PotatoPlugin.Log.LogWarning($">>> 摄像机镜像: ON (已翻转 {mirroredCount} 个摄像机，画面已水平翻转) <<<");
+                EnableMirrorMode();
             }
             else
             {
-                PotatoPlugin.Log.LogWarning($">>> 摄像机镜像: OFF (已恢复 {mirroredCount} 个摄像机) <<<");
+                DisableMirrorMode();
+            }
+        }
+
+        private void EnableMirrorMode()
+        {
+            Camera mainCam = Camera.main;
+            if (mainCam == null)
+            {
+                PotatoPlugin.Log.LogWarning(">>> 未找到主摄像机，跳过镜像 <<<");
+                return;
+            }
+
+            try
+            {
+                // 1. 创建 RenderTexture
+                mirrorRenderTexture = CreateMirrorRenderTexture();
+                mainCam.targetTexture = mirrorRenderTexture;
+
+                // 2. 创建翻转材质
+                mirrorFlipMaterial = CreateFlipMaterial();
+
+                // 3. 创建全屏 Canvas + RawImage
+                CreateMirrorCanvas();
+
+                // 4. 启用输入镜像
+                isInputMirrored = true;
+
+                // 5. 启用音频声道交换
+                EnableAudioSwap();
+
+                PotatoPlugin.Log.LogWarning(">>> 镜像模式: ON (RenderTexture 方案，不破坏法线) <<<");
+            }
+            catch (Exception e)
+            {
+                PotatoPlugin.Log.LogError($"启用镜像模式失败: {e.Message}");
+                DisableMirrorMode(); // 清理失败的资源
+            }
+        }
+
+        private void DisableMirrorMode()
+        {
+            Camera mainCam = Camera.main;
+            if (mainCam != null)
+            {
+                mainCam.targetTexture = null;
+            }
+
+            // 清理资源
+            if (mirrorCanvas != null) 
+            {
+                Destroy(mirrorCanvas);
+                mirrorCanvas = null;
+            }
+            
+            if (mirrorRenderTexture != null) 
+            {
+                mirrorRenderTexture.Release();
+                mirrorRenderTexture = null;
+            }
+            
+            if (mirrorFlipMaterial != null) 
+            {
+                Destroy(mirrorFlipMaterial);
+                mirrorFlipMaterial = null;
+            }
+
+            mirrorRawImage = null;
+
+            // 禁用输入镜像
+            isInputMirrored = false;
+
+            // 禁用音频声道交换
+            DisableAudioSwap();
+
+            PotatoPlugin.Log.LogWarning(">>> 镜像模式: OFF <<<");
+        }
+
+        private RenderTexture CreateMirrorRenderTexture()
+        {
+            // 考虑土豆模式的 renderScale（如果可用）
+            float renderScale = 1.0f;
+            
+            // 尝试获取 renderScale（某些Unity版本可能不支持）
+            try
+            {
+                var pipeline = GraphicsSettings.currentRenderPipeline;
+                if (pipeline != null)
+                {
+                    PropertyInfo scaleProp = pipeline.GetType().GetProperty("renderScale");
+                    if (scaleProp != null && scaleProp.CanRead)
+                    {
+                        object scaleValue = scaleProp.GetValue(pipeline, null);
+                        if (scaleValue != null)
+                        {
+                            renderScale = (float)scaleValue;
+                        }
+                    }
+                }
+            }
+            catch
+            {
+                // 忽略错误，使用默认值 1.0
+            }
+
+            int width = Mathf.Max(256, (int)(Screen.width * renderScale));
+            int height = Mathf.Max(256, (int)(Screen.height * renderScale));
+
+            RenderTexture rt = new RenderTexture(width, height, 24);
+            rt.name = "MirrorRT";
+            rt.antiAliasing = QualitySettings.antiAliasing > 0 ? QualitySettings.antiAliasing : 1;
+            rt.filterMode = FilterMode.Bilinear;
+            rt.wrapMode = TextureWrapMode.Clamp;
+            rt.Create();
+
+            PotatoPlugin.Log.LogInfo($"创建 RenderTexture: {width}x{height} (renderScale={renderScale:F2})");
+            return rt;
+        }
+
+        private void CreateMirrorCanvas()
+        {
+            // 创建 Canvas GameObject
+            mirrorCanvas = new GameObject("MirrorCanvas");
+            DontDestroyOnLoad(mirrorCanvas);
+
+            Canvas canvas = mirrorCanvas.AddComponent<Canvas>();
+            canvas.renderMode = RenderMode.ScreenSpaceOverlay;
+            canvas.sortingOrder = -100; // 最底层，不遮挡游戏 UI
+
+            CanvasScaler scaler = mirrorCanvas.AddComponent<CanvasScaler>();
+            scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
+            scaler.referenceResolution = new Vector2(1920, 1080);
+
+            // 不添加 GraphicRaycaster - 避免拦截鼠标事件
+
+            // 创建 RawImage
+            GameObject rawImageObj = new GameObject("MirrorDisplay");
+            rawImageObj.transform.SetParent(mirrorCanvas.transform, false);
+
+            mirrorRawImage = rawImageObj.AddComponent<RawImage>();
+            mirrorRawImage.texture = mirrorRenderTexture;
+            mirrorRawImage.material = mirrorFlipMaterial;
+            mirrorRawImage.raycastTarget = false; // 关键：允许点击穿透到3D场景
+
+            // 拉伸到全屏
+            RectTransform rt = rawImageObj.GetComponent<RectTransform>();
+            rt.anchorMin = Vector2.zero;
+            rt.anchorMax = Vector2.one;
+            rt.offsetMin = Vector2.zero;
+            rt.offsetMax = Vector2.zero;
+        }
+
+        private Material CreateFlipMaterial()
+        {
+            // 使用 Unity 内置 UI Shader
+            Shader shader = Shader.Find("UI/Default");
+            if (shader == null)
+            {
+                PotatoPlugin.Log.LogWarning("未找到 UI/Default Shader，尝试使用 Unlit/Texture");
+                shader = Shader.Find("Unlit/Texture");
+            }
+
+            Material mat = new Material(shader);
+            
+            // 通过材质属性实现 UV 水平翻转
+            mat.mainTextureScale = new Vector2(-1, 1);
+            mat.mainTextureOffset = new Vector2(1, 0);
+
+            return mat;
+        }
+
+        private void EnableAudioSwap()
+        {
+            try
+            {
+                // 查找 AudioListener
+                AudioListener listener = FindObjectOfType<AudioListener>();
+                if (listener == null)
+                {
+                    PotatoPlugin.Log.LogWarning("未找到 AudioListener，跳过音频镜像");
+                    return;
+                }
+
+                // 添加声道交换组件
+                audioSwapper = listener.gameObject.GetComponent<AudioChannelSwapper>();
+                if (audioSwapper == null)
+                {
+                    audioSwapper = listener.gameObject.AddComponent<AudioChannelSwapper>();
+                }
+
+                audioSwapper.enabled = true;
+                PotatoPlugin.Log.LogInfo("已启用音频声道交换 (左右互换)");
+            }
+            catch (Exception e)
+            {
+                PotatoPlugin.Log.LogError($"启用音频镜像失败: {e.Message}");
+            }
+        }
+
+        private void DisableAudioSwap()
+        {
+            if (audioSwapper != null)
+            {
+                audioSwapper.enabled = false;
+                PotatoPlugin.Log.LogInfo("已禁用音频声道交换");
             }
         }
 
@@ -542,6 +785,103 @@ namespace PotatoOptimization
             catch (Exception e)
             {
                 PotatoPlugin.Log.LogWarning($"设置属性失败 [{propName}]: {e.Message}");
+            }
+        }
+
+        void OnDestroy()
+        {
+            // 清理镜像资源
+            if (isCameraMirrored)
+            {
+                DisableMirrorMode();
+            }
+
+            // 取消场景加载回调
+            SceneManager.sceneLoaded -= OnSceneLoaded;
+        }
+    }
+
+    // ==========================================
+    // 4. Harmony Patch: 拦截鼠标输入并镜像翻转
+    // ==========================================
+    [HarmonyPatch(typeof(Input), "mousePosition", MethodType.Getter)]
+    public class InputMousePositionPatch
+    {
+        static void Postfix(ref Vector3 __result)
+        {
+            // 关键修复：仅在点击 3D 场景时翻转，点击 UI 时保持原始坐标
+            if (PotatoController.isInputMirrored)
+            {
+                // 检测鼠标下是否有 UI 元素
+                if (IsPointerOverUI(__result))
+                {
+                    // 鼠标在 UI 上，不翻转（UI 本身没有镜像）
+                    return;
+                }
+
+                // 鼠标在 3D 场景上，翻转坐标
+                __result = new Vector3(
+                    Screen.width - __result.x,  // 水平翻转
+                    __result.y,                   // Y 保持不变
+                    __result.z                    // Z 保持不变
+                );
+            }
+        }
+
+        /// <summary>
+        /// 检测鼠标位置是否在 UI 元素上
+        /// </summary>
+        private static bool IsPointerOverUI(Vector3 mousePosition)
+        {
+            // 方法1: 使用 EventSystem (推荐)
+            if (EventSystem.current != null)
+            {
+                PointerEventData eventData = new PointerEventData(EventSystem.current)
+                {
+                    position = new Vector2(mousePosition.x, mousePosition.y)
+                };
+
+                List<RaycastResult> results = new List<RaycastResult>();
+                EventSystem.current.RaycastAll(eventData, results);
+
+                // 过滤掉镜像 Canvas（MirrorCanvas）
+                foreach (var result in results)
+                {
+                    if (result.gameObject != null && 
+                        result.gameObject.name != "MirrorDisplay" && 
+                        result.gameObject.GetComponentInParent<Canvas>() != null &&
+                        result.gameObject.GetComponentInParent<Canvas>().name != "MirrorCanvas")
+                    {
+                        return true; // 检测到游戏 UI
+                    }
+                }
+            }
+
+            return false; // 没有 UI，是 3D 场景
+        }
+    }
+
+    // ==========================================
+    // 5. 音频声道交换组件
+    // ==========================================
+    /// <summary>
+    /// 音频滤镜：交换左右声道，用于镜像模式
+    /// </summary>
+    public class AudioChannelSwapper : MonoBehaviour
+    {
+        void OnAudioFilterRead(float[] data, int channels)
+        {
+            // 仅处理立体声 (2 声道)
+            if (channels != 2)
+                return;
+
+            // 交换左右声道
+            // data 格式: [L0, R0, L1, R1, L2, R2, ...]
+            for (int i = 0; i < data.Length; i += 2)
+            {
+                float temp = data[i];       // 保存左声道
+                data[i] = data[i + 1];      // 左 = 右
+                data[i + 1] = temp;         // 右 = 左
             }
         }
     }

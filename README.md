@@ -67,6 +67,9 @@
 - `F2` - 变成土豆/变成薯条
 	- 让游戏变模糊，约等于设置里的渲染分辨率最低效果
 - `F3` - 在无边框小窗和上一个窗口形态之间游龙切换
+- `F4` - 切换摄像机镜像模式（左右翻转画面）
+	- 视觉、输入、音频完全镜像，沉浸式体验
+	- 自适应窗口大小变化，无需手动调整
 
 
 ## ⚠️ 本项目可能有
@@ -132,8 +135,21 @@ PotatoModeKey = F2
 ## 切换画中画小窗的按键
 # Setting type: KeyCode
 # Default value: F3
-# # 默认F3，能用就别乱改
+# 默认F3，能用就别乱改
 PiPModeKey = F3
+
+## 切换摄像机镜像的按键(左右翻转画面)
+# Setting type: KeyCode
+# Default value: F4
+# 默认F4，镜像模式包含视觉、输入、音频完全翻转
+CameraMirrorKey = F4
+
+[Camera]
+
+## 启动时是否自动启用摄像机镜像(默认关闭,建议先用UE Explorer测试)
+# Setting type: Boolean
+# Default value: false
+EnableMirrorOnStart = false
 
 [Window]
 
@@ -169,15 +185,33 @@ DragMethod = RightClick_Hold
 ## 📝 版本历史
 > 注：版本号为 AI 自己写的，不关我的事
 
+### v1.7.0（最新版本）
+- ✨ **镜像模式重大改进**：完全重写镜像实现，修复所有已知问题
+  - 🎨 **修复光照撕裂**：改用 RenderTexture + UV 翻转方案，不再破坏角色法线和蒙皮权重
+  - 🖱️ **智能输入映射**：鼠标点击自动适配镜像画面，点击 UI 和 3D 场景时坐标分别处理
+  - 🎧 **音频声道交换**：镜像模式下自动交换左右声道，视听完全一致
+  - 🖼️ **自动分辨率适配**：窗口大小变化时自动重建 RenderTexture，无蓝屏问题
+  - 🔧 **资源管理优化**：正确释放 RenderTexture/Canvas/Material，无内存泄漏
+- 🎯 **新增功能**：
+  - `F4` - 切换摄像机镜像模式（左右翻转画面）
+  - 配置项：`CfgEnableMirror` - 启动时是否自动启用镜像（默认关闭）
+- 🐛 **Bug 修复**：
+  - 修复镜像模式下点击事件穿透问题（UI 可正常点击）
+  - 修复窗口调整大小时画面变蓝的问题
+  - 修复鼠标输入无限递归导致的死锁问题
+
 ### v1.6.0
 - 第一个发布版本，后续看看能不能优化一下土豆模式，不过游戏优化这块我还真不懂
 
-详细更新日志请查看 [Git 提交记录](https://github.com/Small-tailqwq/RealTimeWeatherMod/commits/master)
+详细更新日志请查看 [Git 提交记录](https://github.com/Small-tailqwq/iGPUSaviorMod/commits/master)
 
 ## 🐛 已知问题
 
 - 土豆模式没啥用
 - 组合键拖动窗口时，偶发需要鼠标点击两次才会生效（~~那你用右键不就完事了~~）
+- ~~镜像模式下光照撕裂问题~~ ✅ v1.7.0 已修复
+- ~~镜像模式下点击事件错位~~ ✅ v1.7.0 已修复
+- ~~调整窗口大小后画面变蓝~~ ✅ v1.7.0 已修复
 
 ## 🤝 贡献
 
