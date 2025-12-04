@@ -129,19 +129,7 @@ namespace ModShared
         }
         
         /// <summary>
-        /// 添加开关（Toggle）- 使用默认父容器
-        /// </summary>
-        public GameObject AddToggle(string label, bool defaultValue, Action<bool> onValueChanged)
-        {
-            if (ModContentParent == null)
-            {
-                throw new InvalidOperationException("ModContentParent 未初始化，请先调用 Initialize()");
-            }
-            return AddToggle(ModContentParent, label, defaultValue, onValueChanged);
-        }
-        
-        /// <summary>
-        /// 添加开关（Toggle）- 指定父容器
+        /// 添加开关（Toggle）
         /// </summary>
         public GameObject AddToggle(GameObject parent, string label, bool defaultValue, Action<bool> onValueChanged)
         {
@@ -152,7 +140,7 @@ namespace ModShared
             toggleContainer.transform.SetParent(row.transform, false);
             
             var containerRect = toggleContainer.AddComponent<RectTransform>();
-            containerRect.sizeDelta = new Vector2(44, 44);  // ✅ 改为 44x44（与 iGPU Savior 一致）
+            containerRect.sizeDelta = new Vector2(200, 40);
             
             // 创建背景
             GameObject toggleBg = new GameObject("Background");
@@ -164,14 +152,14 @@ namespace ModShared
             bgRect.sizeDelta = Vector2.zero;
             
             var bgImage = toggleBg.AddComponent<Image>();
-            bgImage.color = new Color(0.29f, 0.29f, 0.32f, 0.5f);  // ✅ 改为深灰蓝（与 iGPU Savior 一致）
+            bgImage.color = new Color(0.2f, 0.2f, 0.2f, 0.5f);
             
             // 创建Checkmark
             GameObject checkmark = new GameObject("Checkmark");
             checkmark.transform.SetParent(toggleContainer.transform, false);
             
             var checkRect = checkmark.AddComponent<RectTransform>();
-            checkRect.sizeDelta = new Vector2(32, 32);  // ✅ 改为 32x32（与 iGPU Savior 一致）
+            checkRect.sizeDelta = new Vector2(30, 30);
             checkRect.anchoredPosition = Vector2.zero;
             
             var checkImage = checkmark.AddComponent<Image>();
@@ -193,19 +181,7 @@ namespace ModShared
         }
         
         /// <summary>
-        /// 添加下拉菜单（Dropdown）- 使用默认父容器
-        /// </summary>
-        public GameObject AddDropdown(string label, List<string> options, int defaultIndex, Action<int> onValueChanged)
-        {
-            if (ModContentParent == null)
-            {
-                throw new InvalidOperationException("ModContentParent 未初始化，请先调用 Initialize()");
-            }
-            return AddDropdown(ModContentParent, label, options, defaultIndex, onValueChanged);
-        }
-        
-        /// <summary>
-        /// 添加下拉菜单（Dropdown）- 指定父容器
+        /// 添加下拉菜单（Dropdown）
         /// </summary>
         public GameObject AddDropdown(GameObject parent, string label, List<string> options, int defaultIndex, Action<int> onValueChanged)
         {
@@ -216,11 +192,11 @@ namespace ModShared
             dropdownObj.transform.SetParent(row.transform, false);
             
             var dropdownRect = dropdownObj.AddComponent<RectTransform>();
-            dropdownRect.sizeDelta = new Vector2(200, 44);  // ✅ 改为 44（与 iGPU Savior 一致）
+            dropdownRect.sizeDelta = new Vector2(200, 40);
             
             // 添加背景Image
             var bgImage = dropdownObj.AddComponent<Image>();
-            bgImage.color = new Color(0.29f, 0.29f, 0.32f, 0.8f);  // ✅ 改为深灰蓝（与 iGPU Savior 一致）
+            bgImage.color = new Color(0.2f, 0.2f, 0.2f, 0.8f);
             
             // 创建Label (显示当前选中项)
             GameObject labelObj = new GameObject("Label");
@@ -233,7 +209,7 @@ namespace ModShared
             labelRect.offsetMax = new Vector2(-30, 0);
             
             var labelText = labelObj.AddComponent<TextMeshProUGUI>();
-            labelText.fontSize = 24;  // ✅ 改为 24（与 iGPU Savior 一致）
+            labelText.fontSize = 16;
             labelText.alignment = TextAlignmentOptions.MidlineLeft;
             labelText.color = Color.white;
             
@@ -281,14 +257,6 @@ namespace ModShared
             GameObject row = new GameObject($"Row_{label}");
             row.transform.SetParent(parent, false);
             
-            // ✅ 配置 RectTransform - 与原生 UI 元素一致
-            var rowRect = row.AddComponent<RectTransform>();
-            rowRect.anchorMin = new Vector2(0, 1);  // 左上角锚点
-            rowRect.anchorMax = new Vector2(1, 1);  // 右上角锚点
-            rowRect.pivot = new Vector2(0, 1);      // ❌ 改为左上角为轴心（不是中心）
-            rowRect.anchoredPosition = Vector2.zero; // 位置 (0, 0)
-            rowRect.sizeDelta = new Vector2(0, 72); // 宽度自适应，高度 72
-            
             var hLayout = row.AddComponent<HorizontalLayoutGroup>();
             hLayout.childControlHeight = false;
             hLayout.childControlWidth = false;
@@ -296,11 +264,13 @@ namespace ModShared
             hLayout.childForceExpandWidth = false;
             hLayout.spacing = 20;
             hLayout.childAlignment = TextAnchor.MiddleLeft;
-            hLayout.padding = new RectOffset(20, 20, 12, 12);  // ✅ 添加内边距
+            
+            var rowRect = row.GetComponent<RectTransform>();
+            rowRect.sizeDelta = new Vector2(0, 50);
             
             var layoutElement = row.AddComponent<LayoutElement>();
-            layoutElement.minHeight = 72;  // ✅ 改为 72
-            layoutElement.preferredHeight = 72;  // ✅ 改为 72
+            layoutElement.minHeight = 50;
+            layoutElement.preferredHeight = 50;
             
             // 创建标签
             GameObject labelObj = new GameObject("Label");
@@ -308,12 +278,12 @@ namespace ModShared
             
             var labelText = labelObj.AddComponent<TextMeshProUGUI>();
             labelText.text = label;
-            labelText.fontSize = 32;  // ✅ 改为 32（与 iGPU Savior 一致）
-            labelText.color = new Color(0.8f, 0.8f, 0.8f, 1f);  // ✅ 改为浅灰
+            labelText.fontSize = 18;
+            labelText.color = Color.white;
             labelText.alignment = TextAlignmentOptions.MidlineLeft;
             
             var labelRect = labelObj.GetComponent<RectTransform>();
-            labelRect.sizeDelta = new Vector2(300, 72);  // ✅ 改为 72
+            labelRect.sizeDelta = new Vector2(300, 50);
             
             var labelLayout = labelObj.AddComponent<LayoutElement>();
             labelLayout.minWidth = 300;
