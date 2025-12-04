@@ -4,6 +4,7 @@ using TMPro;
 using System;
 using System.Linq;
 using PotatoOptimization.Core;
+using Bulbul;
 
 namespace PotatoOptimization.UI
 {
@@ -116,9 +117,22 @@ namespace PotatoOptimization.UI
                     btnOn.interactable = !state;
                     btnOff.interactable = state;
                     
-                    // 如果原版有额外的脚本控制高亮 (比如 InteractableUI)，
-                    // 仅改 interactable 可能不够，我们需要更深层的“视觉欺骗”
-                    // 但首先，我们试试最简单的 interactable，因为这是 Unity 标准
+                    // ✅ 新增：调用InteractableUI的激活/反激活方法以获得完整的视觉效果
+                    var btnOnInteractableUI = btnOn.GetComponent<InteractableUI>();
+                    var btnOffInteractableUI = btnOff.GetComponent<InteractableUI>();
+                    
+                    if (state)
+                    {
+                        // ON被选中：激活ON按钮，反激活OFF按钮
+                        btnOnInteractableUI?.ActivateUseUI(false);
+                        btnOffInteractableUI?.DeactivateUseUI(false);
+                    }
+                    else
+                    {
+                        // OFF被选中：反激活ON按钮，激活OFF按钮
+                        btnOnInteractableUI?.DeactivateUseUI(false);
+                        btnOffInteractableUI?.ActivateUseUI(false);
+                    }
                 }
 
                 // 绑定点击

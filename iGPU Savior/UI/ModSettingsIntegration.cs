@@ -421,6 +421,9 @@ namespace PotatoOptimization.UI
             audioParent?.SetActive(false);
             creditsParent?.SetActive(false);
 
+            // ✅ 新增：反激活所有原生标签按钮的UI状态
+            DeactivateAllNativeTabButtons(settingUI);
+
             // Close all MOD dropdowns before showing MOD tab (mimicking native behavior)
             OnOpenModTab();
             
@@ -551,6 +554,29 @@ namespace PotatoOptimization.UI
             catch (System.Exception e)
             {
                 PotatoPlugin.Log.LogWarning($"Failed to update tab states: {e.Message}");
+            }
+        }
+
+        /// <summary>
+        /// ✅ 新增方法：反激活所有原生标签按钮（General, Graphics, Audio, Credits）
+        /// </summary>
+        private static void DeactivateAllNativeTabButtons(SettingUI settingUI)
+        {
+            try
+            {
+                var generalButton = AccessTools.Field(typeof(SettingUI), "_generalInteractableUI").GetValue(settingUI) as InteractableUI;
+                var graphicButton = AccessTools.Field(typeof(SettingUI), "_graphicInteractableUI").GetValue(settingUI) as InteractableUI;
+                var audioButton = AccessTools.Field(typeof(SettingUI), "_audioInteractableUI").GetValue(settingUI) as InteractableUI;
+                var creditsButton = AccessTools.Field(typeof(SettingUI), "_creditsInteractableUI").GetValue(settingUI) as InteractableUI;
+
+                generalButton?.DeactivateUseUI(false);
+                graphicButton?.DeactivateUseUI(false);
+                audioButton?.DeactivateUseUI(false);
+                creditsButton?.DeactivateUseUI(false);
+            }
+            catch (System.Exception e)
+            {
+                PotatoPlugin.Log.LogWarning($"Failed to deactivate native tab buttons: {e.Message}");
             }
         }
 

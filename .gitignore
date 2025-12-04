@@ -6,6 +6,7 @@
 docs
 .claude/
 .vscode/
+.github/
 # User-specific files
 *.rsuser
 *.suo
