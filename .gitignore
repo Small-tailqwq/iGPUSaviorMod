@@ -5,7 +5,7 @@
 
 docs
 .claude/
-
+.vscode/
 # User-specific files
 *.rsuser
 *.suo
