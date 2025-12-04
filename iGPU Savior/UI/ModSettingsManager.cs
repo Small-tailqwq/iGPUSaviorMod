@@ -1,31 +1,47 @@
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
-using R3;
+using PotatoOptimization.UI;
 
 namespace ModShared
 {
-    /// <summary>
-    /// 公共的MOD设置管理器 - 所有MOD共享
-    /// </summary>
     public class ModSettingsManager : MonoBehaviour
     {
         public static ModSettingsManager Instance { get; private set; }
         
-        public GameObject ModTabButton { get; private set; }
-        public GameObject ModContentParent { get; private set; }
-        public ScrollRect ModScrollRect { get; private set; }
+        // === 兼容性修复：加回 IsInitialized，让 EnvSync 能检测到 ===
+        public bool IsInitialized { get; private set; } = false;
+
+        private abstract class SettingItemDef { public string Label; }
+        private class ToggleDef : SettingItemDef { public bool DefaultValue; public Action<bool> OnValueChanged; }
+        private class DropdownDef : SettingItemDef { public List<string> Options; public int DefaultIndex; public Action<int> OnValueChanged; }
+
+        private class ModData
+        {
+            public string Name;
+            public string Version;
+            public List<SettingItemDef> Items = new List<SettingItemDef>();
+        }
+
+        private List<ModData> _registeredMods = new List<ModData>();
+        private ModData _currentRegisteringMod;
         
-        private List<string> registeredMods = new List<string>();
-        public bool IsInitialized { get; private set; }
-        
+        private Transform _contentParent;
+        private Transform _settingUIRoot;
+        private bool _isBuildingUI = false;
+
+        // === 布局常量：左侧标签的强制宽度，确保对齐 ===
+        private const float LABEL_WIDTH = 380f; 
+
         void Awake()
         {
             if (Instance == null)
             {
                 Instance = this;
+                IsInitialized = true; // 标记初始化完成
                 DontDestroyOnLoad(gameObject);
             }
             else if (Instance != this)
@@ -33,291 +49,203 @@ namespace ModShared
                 Destroy(gameObject);
             }
         }
-        
-        public void Initialize(GameObject tabButton, GameObject contentParent, ScrollRect scrollRect)
+
+        public void RegisterMod(string modName, string modVersion)
         {
-            if (IsInitialized)
+            var existing = _registeredMods.Find(m => m.Name == modName);
+            if (existing != null)
             {
-                Debug.LogWarning("[ModSettings] Already initialized!");
+                _currentRegisteringMod = existing;
                 return;
             }
-            
-            ModTabButton = tabButton;
-            ModContentParent = contentParent;
-            ModScrollRect = scrollRect;
-            IsInitialized = true;
-            
-            Debug.Log("[ModSettings] Mod Settings tab initialized!");
+            ModData newMod = new ModData { Name = modName, Version = modVersion };
+            _registeredMods.Add(newMod);
+            _currentRegisteringMod = newMod;
+            // 注意：这里我去掉了"成功"二字，方便我们在日志里确认代码是否更新
+            PotatoOptimization.Core.PotatoPlugin.Log.LogInfo($"[ModManager] Mod 注册: {modName}");
         }
-        
-        public GameObject RegisterMod(string modName, string modVersion)
+
+        // === 兼容性修复：处理 EnvSync 这种未调用 RegisterMod 直接 Add 的情况 ===
+        private void EnsureCurrentMod()
         {
-            if (!IsInitialized)
+            if (_currentRegisteringMod == null)
             {
-                Debug.LogError($"[ModSettings] Not initialized! {modName} cannot register.");
-                return null;
+                RegisterMod("General Settings", ""); // 自动归入通用设置
+            }
+        }
+
+        public void AddToggle(string label, bool defaultValue, Action<bool> onValueChanged)
+        {
+            EnsureCurrentMod();
+            _currentRegisteringMod.Items.Add(new ToggleDef 
+            { Label = label, DefaultValue = defaultValue, OnValueChanged = onValueChanged });
+        }
+
+        public void AddDropdown(string label, List<string> options, int defaultIndex, Action<int> onValueChanged)
+        {
+            EnsureCurrentMod();
+            _currentRegisteringMod.Items.Add(new DropdownDef 
+            { Label = label, Options = options, DefaultIndex = defaultIndex, OnValueChanged = onValueChanged });
+        }
+
+        public void RebuildUI(Transform contentParent, Transform settingUIRoot)
+        {
+            if (_isBuildingUI) return;
+            _contentParent = contentParent;
+            _settingUIRoot = settingUIRoot;
+            StartCoroutine(BuildSequence());
+        }
+
+        private IEnumerator BuildSequence()
+        {
+            _isBuildingUI = true;
+            foreach (Transform child in _contentParent) Destroy(child.gameObject);
+            yield return null;
+
+            foreach (var mod in _registeredMods)
+            {
+                // 如果是 General Settings 且没有版本号，就不显示 Header
+                if (mod.Name != "General Settings" || !string.IsNullOrEmpty(mod.Version))
+                {
+                    CreateSectionHeader(mod.Name, mod.Version);
+                }
+                
+                foreach (var item in mod.Items)
+                {
+                    if (item is ToggleDef toggle)
+                    {
+                        GameObject obj = ModToggleCloner.CreateToggle(_settingUIRoot, toggle.Label, toggle.DefaultValue, toggle.OnValueChanged);
+                        if (obj != null)
+                        {
+                            obj.transform.SetParent(_contentParent, false);
+                            EnforceLayout(obj); // === 强制对齐 ===
+                            obj.SetActive(true);
+                        }
+                    }
+                    else if (item is DropdownDef dropdown)
+                    {
+                        yield return CreateDropdownSequence(dropdown);
+                    }
+                }
+                CreateDivider();
             }
             
-            if (registeredMods.Contains(modName))
+            LayoutRebuilder.ForceRebuildLayoutImmediate(_contentParent as RectTransform);
+            _isBuildingUI = false;
+        }
+
+        private IEnumerator CreateDropdownSequence(DropdownDef def)
+        {
+            GameObject pulldownClone = ModPulldownCloner.CloneAndClearPulldown(_settingUIRoot);
+            if (pulldownClone == null) yield break;
+
+            // 设置标题
+            var paths = new[] { "TitleText", "Title/Text", "Text" };
+            foreach(var p in paths) {
+                var t = pulldownClone.transform.Find(p);
+                if(t != null) {
+                    var tmp = t.GetComponent<TMP_Text>();
+                    if(tmp) { tmp.text = def.Label; break; }
+                }
+            }
+
+            GameObject buttonTemplate = ModPulldownCloner.GetSelectButtonTemplate(_settingUIRoot);
+            for (int i = 0; i < def.Options.Count; i++)
             {
-                Debug.LogWarning($"[ModSettings] {modName} already registered!");
-                return null;
+                int idx = i;
+                ModPulldownCloner.AddOption(pulldownClone, buttonTemplate, def.Options[i], () => def.OnValueChanged?.Invoke(idx));
             }
             
-            registeredMods.Add(modName);
-            GameObject modSection = CreateModSection(modName, modVersion);
+            if (def.DefaultIndex >= 0 && def.DefaultIndex < def.Options.Count)
+                UpdatePulldownSelectedText(pulldownClone, def.Options[def.DefaultIndex]);
+
+            Destroy(buttonTemplate);
+            pulldownClone.transform.SetParent(_contentParent, false);
             
-            Debug.Log($"[ModSettings] {modName} v{modVersion} registered successfully!");
-            return modSection;
+            EnforceLayout(pulldownClone); // === 强制对齐 ===
+            pulldownClone.SetActive(true);
+
+            Transform content = pulldownClone.transform.Find("PulldownList/Pulldown/CurrentSelectText (TMP)/Content");
+            LayoutRebuilder.ForceRebuildLayoutImmediate(content as RectTransform);
+            Canvas.ForceUpdateCanvases();
+            yield return null;
+            LayoutRebuilder.ForceRebuildLayoutImmediate(content as RectTransform);
+            yield return null;
+            
+            float contentHeight = (content as RectTransform).sizeDelta.y;
+            if (contentHeight < 40f) contentHeight = def.Options.Count * 40f;
+
+            Transform originalPulldown = _settingUIRoot.Find("Graphics/ScrollView/Viewport/Content/GraphicQualityPulldownList");
+            ModPulldownCloner.EnsurePulldownListUI(pulldownClone, originalPulldown, content, contentHeight);
+            
+            yield return new WaitForSeconds(0.05f); 
         }
-        
-        private GameObject CreateModSection(string modName, string modVersion)
+
+        // === 核心方法：强制修正布局（解决文字挤压问题） ===
+        private void EnforceLayout(GameObject obj)
         {
-            GameObject section = new GameObject($"ModSection_{modName}");
-            section.transform.SetParent(ModContentParent.transform, false);
-            
-            var layout = section.AddComponent<VerticalLayoutGroup>();
-            layout.spacing = 15;
-            layout.padding = new RectOffset(20, 20, 15, 15);
-            layout.childControlHeight = false;
-            layout.childControlWidth = true;
-            layout.childForceExpandHeight = false;
-            layout.childForceExpandWidth = true;
-            
-            var fitter = section.AddComponent<ContentSizeFitter>();
-            fitter.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
-            
-            CreateSectionTitle(section.transform, modName, modVersion);
-            
-            if (registeredMods.Count > 1)
+            // 1. 归位 (解决 -145 偏移)
+            obj.transform.localPosition = Vector3.zero;
+            obj.transform.localScale = Vector3.one;
+            obj.transform.localRotation = Quaternion.identity;
+
+            // 2. 寻找 Label 并强制设置宽度
+            var texts = obj.GetComponentsInChildren<TMP_Text>(true);
+            foreach (var t in texts)
             {
-                CreateDivider(section.transform);
+                // 只处理左侧的标题文字
+                if (t.transform.position.x < obj.transform.position.x + 100 || t.name.Contains("Title"))
+                {
+                    var le = t.GetComponent<LayoutElement>();
+                    if (le == null) le = t.gameObject.AddComponent<LayoutElement>();
+                    
+                    // 强制宽度 380，让右边的按钮对齐
+                    le.minWidth = LABEL_WIDTH;
+                    le.preferredWidth = LABEL_WIDTH;
+                    le.flexibleWidth = 0; 
+                    
+                    t.alignment = TextAlignmentOptions.MidlineLeft; 
+                    break; 
+                }
             }
-            
-            return section;
         }
-        
-        private void CreateSectionTitle(Transform parent, string modName, string version)
+
+        private void CreateSectionHeader(string name, string version)
         {
-            GameObject titleObj = new GameObject("Title");
-            titleObj.transform.SetParent(parent, false);
+            GameObject obj = new GameObject($"Header_{name}");
+            obj.transform.SetParent(_contentParent, false);
+
+            var rect = obj.AddComponent<RectTransform>();
+            rect.sizeDelta = new Vector2(0, 55);
             
-            var titleText = titleObj.AddComponent<TextMeshProUGUI>();
-            titleText.text = $"<b>{modName}</b> <size=16><color=#888888>v{version}</color></size>";
-            titleText.fontSize = 24;
-            titleText.fontStyle = FontStyles.Bold;
-            titleText.color = Color.white;
-            
-            var rectTransform = titleObj.GetComponent<RectTransform>();
-            rectTransform.sizeDelta = new Vector2(0, 40);
+            var le = obj.AddComponent<LayoutElement>();
+            le.minHeight = 55f;
+            le.preferredHeight = 55f;
+            le.flexibleWidth = 1f;
+
+            var tmp = obj.AddComponent<TextMeshProUGUI>();
+            string verStr = string.IsNullOrEmpty(version) ? "" : $" <size=18><color=#888888>v{version}</color></size>";
+            tmp.text = $"<size=24><b>{name}</b></size>{verStr}";
+            tmp.alignment = TextAlignmentOptions.BottomLeft;
+            tmp.color = Color.white;
         }
-        
-        private void CreateDivider(Transform parent)
+
+        private void CreateDivider()
         {
-            GameObject divider = new GameObject("Divider");
-            divider.transform.SetParent(parent, false);
-            
-            var image = divider.AddComponent<Image>();
-            image.color = new Color(0.5f, 0.5f, 0.5f, 0.3f);
-            
-            var rectTransform = divider.GetComponent<RectTransform>();
-            rectTransform.sizeDelta = new Vector2(0, 2);
-            
-            var layout = divider.AddComponent<LayoutElement>();
-            layout.minHeight = 2;
-            layout.preferredHeight = 2;
+            GameObject obj = new GameObject("Divider");
+            obj.transform.SetParent(_contentParent, false);
+            var le = obj.AddComponent<LayoutElement>();
+            le.minHeight = 20f;
+            le.preferredHeight = 20f;
         }
-        
-        /// <summary>
-        /// 添加开关（Toggle）
-        /// </summary>
-        public GameObject AddToggle(GameObject parent, string label, bool defaultValue, Action<bool> onValueChanged)
+
+        private void UpdatePulldownSelectedText(GameObject clone, string text)
         {
-            GameObject row = CreateSettingRow(parent.transform, label);
-            
-            // 创建Toggle容器
-            GameObject toggleContainer = new GameObject("ToggleContainer");
-            toggleContainer.transform.SetParent(row.transform, false);
-            
-            var containerRect = toggleContainer.AddComponent<RectTransform>();
-            containerRect.sizeDelta = new Vector2(200, 40);
-            
-            // 创建背景
-            GameObject toggleBg = new GameObject("Background");
-            toggleBg.transform.SetParent(toggleContainer.transform, false);
-            
-            var bgRect = toggleBg.AddComponent<RectTransform>();
-            bgRect.anchorMin = Vector2.zero;
-            bgRect.anchorMax = Vector2.one;
-            bgRect.sizeDelta = Vector2.zero;
-            
-            var bgImage = toggleBg.AddComponent<Image>();
-            bgImage.color = new Color(0.2f, 0.2f, 0.2f, 0.5f);
-            
-            // 创建Checkmark
-            GameObject checkmark = new GameObject("Checkmark");
-            checkmark.transform.SetParent(toggleContainer.transform, false);
-            
-            var checkRect = checkmark.AddComponent<RectTransform>();
-            checkRect.sizeDelta = new Vector2(30, 30);
-            checkRect.anchoredPosition = Vector2.zero;
-            
-            var checkImage = checkmark.AddComponent<Image>();
-            checkImage.color = Color.white;
-            checkImage.sprite = CreateCheckmarkSprite();
-            
-            // 创建Toggle组件
-            var toggle = toggleContainer.AddComponent<Toggle>();
-            toggle.targetGraphic = bgImage;
-            toggle.graphic = checkImage;
-            toggle.isOn = defaultValue;
-            
-            if (onValueChanged != null)
-            {
-                toggle.onValueChanged.AddListener(onValueChanged.Invoke);
+            var paths = new[] { "PulldownList/Pulldown/CurrentSelectText (TMP)", "CurrentSelectText (TMP)" };
+            foreach (var p in paths) {
+                var t = clone.transform.Find(p);
+                if (t != null) { var tmp = t.GetComponent<TMP_Text>(); if (tmp) { tmp.text = text; return; } }
             }
-            
-            return row;
-        }
-        
-        /// <summary>
-        /// 添加下拉菜单（Dropdown）
-        /// </summary>
-        public GameObject AddDropdown(GameObject parent, string label, List<string> options, int defaultIndex, Action<int> onValueChanged)
-        {
-            GameObject row = CreateSettingRow(parent.transform, label);
-            
-            // 创建Dropdown容器
-            GameObject dropdownObj = new GameObject("Dropdown");
-            dropdownObj.transform.SetParent(row.transform, false);
-            
-            var dropdownRect = dropdownObj.AddComponent<RectTransform>();
-            dropdownRect.sizeDelta = new Vector2(200, 40);
-            
-            // 添加背景Image
-            var bgImage = dropdownObj.AddComponent<Image>();
-            bgImage.color = new Color(0.2f, 0.2f, 0.2f, 0.8f);
-            
-            // 创建Label (显示当前选中项)
-            GameObject labelObj = new GameObject("Label");
-            labelObj.transform.SetParent(dropdownObj.transform, false);
-            
-            var labelRect = labelObj.AddComponent<RectTransform>();
-            labelRect.anchorMin = new Vector2(0, 0);
-            labelRect.anchorMax = new Vector2(1, 1);
-            labelRect.offsetMin = new Vector2(10, 0);
-            labelRect.offsetMax = new Vector2(-30, 0);
-            
-            var labelText = labelObj.AddComponent<TextMeshProUGUI>();
-            labelText.fontSize = 16;
-            labelText.alignment = TextAlignmentOptions.MidlineLeft;
-            labelText.color = Color.white;
-            
-            // 创建箭头
-            GameObject arrowObj = new GameObject("Arrow");
-            arrowObj.transform.SetParent(dropdownObj.transform, false);
-            
-            var arrowRect = arrowObj.AddComponent<RectTransform>();
-            arrowRect.anchorMin = new Vector2(1, 0.5f);
-            arrowRect.anchorMax = new Vector2(1, 0.5f);
-            arrowRect.pivot = new Vector2(0.5f, 0.5f);
-            arrowRect.sizeDelta = new Vector2(20, 20);
-            arrowRect.anchoredPosition = new Vector2(-15, 0);
-            
-            var arrowText = arrowObj.AddComponent<TextMeshProUGUI>();
-            arrowText.text = "▼";
-            arrowText.fontSize = 14;
-            arrowText.alignment = TextAlignmentOptions.Center;
-            arrowText.color = Color.white;
-            
-            // 创建Dropdown组件
-            var dropdown = dropdownObj.AddComponent<TMP_Dropdown>();
-            dropdown.targetGraphic = bgImage;
-            dropdown.captionText = labelText;
-            
-            // 添加选项
-            dropdown.ClearOptions();
-            dropdown.AddOptions(options);
-            dropdown.value = defaultIndex;
-            dropdown.RefreshShownValue();
-            
-            if (onValueChanged != null)
-            {
-                dropdown.onValueChanged.AddListener(onValueChanged.Invoke);
-            }
-            
-            return row;
-        }
-        
-        /// <summary>
-        /// 创建设置行（标签 + 控件）
-        /// </summary>
-        private GameObject CreateSettingRow(Transform parent, string label)
-        {
-            GameObject row = new GameObject($"Row_{label}");
-            row.transform.SetParent(parent, false);
-            
-            var hLayout = row.AddComponent<HorizontalLayoutGroup>();
-            hLayout.childControlHeight = false;
-            hLayout.childControlWidth = false;
-            hLayout.childForceExpandHeight = false;
-            hLayout.childForceExpandWidth = false;
-            hLayout.spacing = 20;
-            hLayout.childAlignment = TextAnchor.MiddleLeft;
-            
-            var rowRect = row.GetComponent<RectTransform>();
-            rowRect.sizeDelta = new Vector2(0, 50);
-            
-            var layoutElement = row.AddComponent<LayoutElement>();
-            layoutElement.minHeight = 50;
-            layoutElement.preferredHeight = 50;
-            
-            // 创建标签
-            GameObject labelObj = new GameObject("Label");
-            labelObj.transform.SetParent(row.transform, false);
-            
-            var labelText = labelObj.AddComponent<TextMeshProUGUI>();
-            labelText.text = label;
-            labelText.fontSize = 18;
-            labelText.color = Color.white;
-            labelText.alignment = TextAlignmentOptions.MidlineLeft;
-            
-            var labelRect = labelObj.GetComponent<RectTransform>();
-            labelRect.sizeDelta = new Vector2(300, 50);
-            
-            var labelLayout = labelObj.AddComponent<LayoutElement>();
-            labelLayout.minWidth = 300;
-            labelLayout.preferredWidth = 300;
-            
-            return row;
-        }
-        
-        /// <summary>
-        /// 创建简单的Checkmark Sprite
-        /// </summary>
-        private Sprite CreateCheckmarkSprite()
-        {
-            // 创建一个简单的勾号纹理
-            Texture2D texture = new Texture2D(32, 32);
-            Color[] pixels = new Color[32 * 32];
-            
-            // 填充透明
-            for (int i = 0; i < pixels.Length; i++)
-            {
-                pixels[i] = Color.clear;
-            }
-            
-            // 画勾号（简化版）
-            for (int i = 10; i < 20; i++)
-            {
-                pixels[i * 32 + 15] = Color.white;
-                pixels[i * 32 + 16] = Color.white;
-            }
-            
-            texture.SetPixels(pixels);
-            texture.Apply();
-            
-            return Sprite.Create(texture, new Rect(0, 0, 32, 32), new Vector2(0.5f, 0.5f));
         }
     }
 }
