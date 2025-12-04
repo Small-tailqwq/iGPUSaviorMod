@@ -187,6 +187,25 @@ namespace PotatoOptimization.UI
                 if (graphicsContent != null)
                 {
                     CopyLayoutFromGraphics(graphicsContent, content);
+                    
+                    // ✅ 确保 Content 的 RectTransform 配置正确
+                    var srcRect = graphicsContent as RectTransform ?? graphicsContent.GetComponent<RectTransform>();
+                    var tgtRect = content as RectTransform ?? content.GetComponent<RectTransform>();
+                    
+                    if (srcRect != null && tgtRect != null)
+                    {
+                        // 只复制 anchor，不复制 position！
+                        tgtRect.anchorMin = srcRect.anchorMin;
+                        tgtRect.anchorMax = srcRect.anchorMax;
+                        tgtRect.pivot = srcRect.pivot;
+                        // ❌ 不要复制 anchoredPosition，它会把内容推到错误位置
+                        // tgtRect.anchoredPosition = srcRect.anchoredPosition;
+                        // ✅ 强制重置为 (0, 0)
+                        tgtRect.anchoredPosition = Vector2.zero;
+                        tgtRect.sizeDelta = new Vector2(0, 0); // 让 ContentSizeFitter 自动计算高度
+                        
+                        PotatoPlugin.Log.LogInfo($"✅ Content RectTransform 已配置: anchorMin={tgtRect.anchorMin}, anchoredPosition={tgtRect.anchoredPosition}");
+                    }
                 }
 
                 // ✅ 检查是否已经有外部 MOD 的设置（通过查找特定的 Row_ 前缀）
@@ -238,6 +257,11 @@ namespace PotatoOptimization.UI
                 {
                     mirrorToggle.transform.SetParent(content, false);
                     mirrorToggle.SetActive(true);
+                    PotatoPlugin.Log.LogInfo($"✅ Mirror Toggle added to content. Parent: {mirrorToggle.transform.parent.name}");
+                }
+                else
+                {
+                    PotatoPlugin.Log.LogError("❌ Failed to create Mirror Toggle");
                 }
                 // ===================================================
 
@@ -285,6 +309,15 @@ namespace PotatoOptimization.UI
                 var contentRect = content as RectTransform ?? content.GetComponent<RectTransform>();
                 if (contentRect != null) LayoutRebuilder.ForceRebuildLayoutImmediate(contentRect);
                 
+                // 🔍 调试：输出 Content 的子对象数量
+                int childCount = content.childCount;
+                PotatoPlugin.Log.LogInfo($"🔍 Content has {childCount} children after adding all settings:");
+                for (int i = 0; i < childCount; i++)
+                {
+                    var child = content.GetChild(i);
+                    PotatoPlugin.Log.LogInfo($"   [{i}] {child.name} (active: {child.gameObject.activeSelf})");
+                }
+                
                 PotatoPlugin.Log.LogInfo("✅ iGPU Savior 设置已注册，外部 MOD 设置得以保留");
             });
         }
@@ -309,10 +342,16 @@ namespace PotatoOptimization.UI
                     tgtRect.anchorMin = srcRect.anchorMin;
                     tgtRect.anchorMax = srcRect.anchorMax;
                     tgtRect.pivot = srcRect.pivot;
-                    tgtRect.offsetMin = srcRect.offsetMin;
-                    tgtRect.offsetMax = srcRect.offsetMax;
-                    tgtRect.anchoredPosition = srcRect.anchoredPosition;
-                    tgtRect.sizeDelta = srcRect.sizeDelta;
+                    // ❌ 不要复制 offsetMin/offsetMax 和 anchoredPosition
+                    // 这些会导致内容被推到错误位置
+                    // tgtRect.offsetMin = srcRect.offsetMin;
+                    // tgtRect.offsetMax = srcRect.offsetMax;
+                    // tgtRect.anchoredPosition = srcRect.anchoredPosition;
+                    // tgtRect.sizeDelta = srcRect.sizeDelta;
+                    
+                    // ✅ 强制重置位置为 (0, 0)，让 LayoutGroup 和 ContentSizeFitter 处理
+                    tgtRect.anchoredPosition = Vector2.zero;
+                    tgtRect.sizeDelta = Vector2.zero;
                 }
 
                 var srcVlg = source.GetComponent<VerticalLayoutGroup>();
@@ -689,13 +728,14 @@ namespace PotatoOptimization.UI
                     return;
                 }
 
-                var rectTransform = pulldownClone.GetComponent<RectTransform>();
-                if (rectTransform != null)
-                {
-                    rectTransform.anchoredPosition = Vector2.zero;
-                    rectTransform.anchoredPosition3D = Vector3.zero;
-                    rectTransform.localPosition = Vector3.zero;
-                }
+                // ❌ 删除位置重置代码 - 让 LayoutGroup 自动处理
+                // var rectTransform = pulldownClone.GetComponent<RectTransform>();
+                // if (rectTransform != null)
+                // {
+                //     rectTransform.anchoredPosition = Vector2.zero;
+                //     rectTransform.anchoredPosition3D = Vector3.zero;
+                //     rectTransform.localPosition = Vector3.zero;
+                // }
 
                 Transform titleTransform = pulldownClone.transform.Find("TitleText");
                 if (titleTransform != null)
