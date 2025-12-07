@@ -117,6 +117,7 @@
     <Compile Include="UI\ModSettingsManager.cs" />
     <Compile Include="UI\ModSettingsIntegration.cs" />
     <Compile Include="UI\ModToggleCloner.cs" />
+    <Compile Include="UI\ModInputFieldCloner.cs" />
     
     
     <!-- Properties -->

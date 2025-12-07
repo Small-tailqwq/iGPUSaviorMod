@@ -115,7 +115,7 @@ namespace PotatoOptimization.UI
 
       var vGroup = content.GetComponent<VerticalLayoutGroup>() ?? content.AddComponent<VerticalLayoutGroup>();
       vGroup.spacing = 16f;
-      vGroup.padding = new RectOffset(60, 40, 20, 20);
+      vGroup.padding = new RectOffset(10, 40, 20, 20);
       vGroup.childAlignment = TextAnchor.UpperLeft;
       vGroup.childControlHeight = false;
       vGroup.childControlWidth = true;
@@ -159,6 +159,25 @@ namespace PotatoOptimization.UI
                   i => PotatoPlugin.Config.KeyPiPMode.Value = GetKey(i));
         manager.AddDropdown("Camera Mirror Hotkey", keyOptions, GetKeyIndex(PotatoPlugin.Config.KeyCameraMirror.Value),
                   i => PotatoPlugin.Config.KeyCameraMirror.Value = GetKey(i));
+
+        // 测试：把 KeyPortraitMode 作为文本框显示
+        // 逻辑：读取当前 Config -> 转 string 显示 -> 用户输入 -> 存入 string (不做校验，用户输错了是用户的事)
+        manager.AddInputField("Portrait Key (Text)", PotatoPlugin.Config.KeyPortraitMode.Value.ToString(), val =>
+        {
+            // 这里我们为了测试"容错不需要"，直接尝试转换，失败拉倒，或者Config本身就是String类型
+            // 如果你的 Config 是 KeyCode 类型，依然得 Parse 一下才能存进去，否则类型不匹配
+            
+            try 
+            {
+                // 简单粗暴：转大写后强转
+                KeyCode newKey = (KeyCode)System.Enum.Parse(typeof(KeyCode), val.ToUpper());
+                PotatoPlugin.Config.KeyPortraitMode.Value = newKey;
+            }
+            catch
+            {
+                PotatoPlugin.Log.LogWarning($"用户输入的 '{val}' 不是有效的 KeyCode，已忽略");
+            }
+        });
 
         var scrollRect = modContentParent.GetComponentInChildren<ScrollRect>();
         if (scrollRect != null)
