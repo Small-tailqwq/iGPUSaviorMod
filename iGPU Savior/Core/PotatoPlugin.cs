@@ -36,7 +36,7 @@ namespace PotatoOptimization.Core
             CreateController();
 
             Log.LogWarning($">>> {Constants.PluginName} v{Constants.PluginVersion} 启动成功 <<<");
-            Log.LogWarning(">>> [V1.6] 插件启动：修复右键抽搐 & 窗口样式还原 & MOD设置UI <<<");
+            Log.LogWarning(">>> [V1.7.1] 插件启动：完善MOD设置UI & 小窗 % 镜像<<<");
         }
 
         private void ApplyHarmonyPatches()

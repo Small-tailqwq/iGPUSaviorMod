@@ -110,7 +110,7 @@ namespace PotatoOptimization.UI
                         }
                     }
 
-                    // C. 输入框对齐
+                    // C. 输入框对齐 (295.75)
                     Transform inputFieldObj = activeFrame.Find("WorkTimeInputField (TMP)");
                     if (inputFieldObj == null) 
                     {
@@ -126,16 +126,14 @@ namespace PotatoOptimization.UI
                         {
                             inputRect.anchorMin = new Vector2(0.5f, 0.5f);
                             inputRect.anchorMax = new Vector2(0.5f, 0.5f);
-                            
-                            // 🔥 关键：保持左对齐轴心，这样 X=40 永远锁定左边缘 🔥
-                            inputRect.pivot = new Vector2(0f, 0.5f); 
+                            inputRect.pivot = new Vector2(0f, 0.5f); // 左轴心
 
-                            // ✅ 你手动测试的完美左对齐坐标
-                            inputRect.anchoredPosition = new Vector2(40f, 0f); 
+                            // 🔥🔥🔥 这里的 Y 必须也是 40！🔥🔥🔥
+                            // 之前可能是 new Vector2(40f, 0f); 
+                            // 现在改为:
+                            inputRect.anchoredPosition = new Vector2(40f, 40f); 
                             
-                            // 🔥🔥🔥 长度补全 🔥🔥🔥
-                            // 原宽 343 + 左移补偿 85 = 428
-                            // 设为 430 应该能完美对齐上面的下拉框右边缘
+                            // 宽度保持你调好的 390
                             inputRect.sizeDelta = new Vector2(405f, 40f); 
                         }
                     }
