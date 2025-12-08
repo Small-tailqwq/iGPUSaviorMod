@@ -313,22 +313,23 @@ var scrollRect = content.GetComponentInParent<ScrollRect>();
     }
     private static void InspectRecursive(Transform t, int depth)
     {
-      string indent = new string('-', depth * 2);
-      var rect = t.GetComponent<RectTransform>();
+      // 性能优化：禁用所有 GetComponent 查询和字符串拼接
+      // string indent = new string('-', depth * 2);
+      // var rect = t.GetComponent<RectTransform>();
 
       // 检查是否有遮罩组件
-      string maskInfo = "";
-      if (t.GetComponent<UnityEngine.UI.Mask>() != null) maskInfo += " [Mask]";
-      if (t.GetComponent<UnityEngine.UI.RectMask2D>() != null) maskInfo += " [RectMask2D]";
-      if (t.GetComponent<UnityEngine.UI.ScrollRect>() != null) maskInfo += " [ScrollRect]";
-      if (t.GetComponent<UnityEngine.UI.Image>() != null) maskInfo += " [Image]";
+      // string maskInfo = "";
+      // if (t.GetComponent<UnityEngine.UI.Mask>() != null) maskInfo += " [Mask]";
+      // if (t.GetComponent<UnityEngine.UI.RectMask2D>() != null) maskInfo += " [RectMask2D]";
+      // if (t.GetComponent<UnityEngine.UI.ScrollRect>() != null) maskInfo += " [ScrollRect]";
+      // if (t.GetComponent<UnityEngine.UI.Image>() != null) maskInfo += " [Image]";
 
       // 打印关键布局信息
-      string layoutInfo = rect != null
-          ? $"Pos={rect.anchoredPosition}, Size={rect.sizeDelta}, AnchorMin={rect.anchorMin}, AnchorMax={rect.anchorMax}, Pivot={rect.pivot}"
-          : "Not RectTransform";
+      // string layoutInfo = rect != null
+      //     ? $"Pos={rect.anchoredPosition}, Size={rect.sizeDelta}, AnchorMin={rect.anchorMin}, AnchorMax={rect.anchorMax}, Pivot={rect.pivot}"
+      //     : "Not RectTransform";
 
-      PotatoPlugin.Log.LogInfo($"{indent}{t.name} {maskInfo} | {layoutInfo}");
+      // PotatoPlugin.Log.LogInfo($"{indent}{t.name} {maskInfo} | {layoutInfo}");
 
       foreach (Transform child in t)
       {
