@@ -255,6 +255,12 @@ var scrollRect = content.GetComponentInParent<ScrollRect>();
           Object.FindObjectOfType<PotatoController>()?.SetMirrorState(val);
         });
 
+        manager.AddToggle("竖优自启动", PotatoPlugin.Config.CfgEnablePortraitMode.Value, val =>
+        {
+          PotatoPlugin.Config.CfgEnablePortraitMode.Value = val;
+          PotatoPlugin.Log.LogInfo($"竖屏优化自启动已设置为: {val}");
+        });
+
         manager.AddDropdown("小窗缩放", new List<string> { "1/3", "1/4", "1/5" },
                   (int)PotatoPlugin.Config.CfgWindowScale.Value - 3,
                   index => PotatoPlugin.Config.CfgWindowScale.Value = (WindowScaleRatio)(index + 3));

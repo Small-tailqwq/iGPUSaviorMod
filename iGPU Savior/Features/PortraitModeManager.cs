@@ -11,6 +11,7 @@ namespace PotatoOptimization.Features
         private bool _isEnabled;
         private bool _isPortraitMode = false;
         private bool _hasOriginalParams = false;
+        private bool _isInitialized = false;  // 标记是否已完成初始化
 
         // 保存的原始相机参数
         private Vector3 _originalPosition;
@@ -21,16 +22,10 @@ namespace PotatoOptimization.Features
         public bool IsEnabled => _isEnabled;
         public bool IsPortraitMode => _isPortraitMode;
 
-        public PortraitModeManager(bool enabledByDefault)
+        public PortraitModeManager()
         {
-            _isEnabled = enabledByDefault;
-            
-            // Save original camera parameters immediately at initialization (in landscape state)
-            // This prevents saving already-adjusted values if game starts in portrait mode
-            if (_isEnabled)
-            {
-                TrySaveOriginalParamsInLandscape();
-            }
+            // 始终从禁用状态开始，由PotatoController决定是否延迟启用
+            _isEnabled = false;
         }
 
         /// <summary>
@@ -41,20 +36,20 @@ namespace PotatoOptimization.Features
             _isEnabled = !_isEnabled;
             PotatoPlugin.Log.LogWarning($">>> 竖屏优化: {(_isEnabled ? "已启用" : "已禁用")} <<<");
 
-            // 如果禁用且当前处于竖屏模式，恢复相机参数
-            if (!_isEnabled && _isPortraitMode)
+            if (!_isEnabled)
             {
+                // 禁用时：恢复相机参数
                 Camera mainCam = Camera.main;
-                if (mainCam != null)
+                if (mainCam != null && _isPortraitMode)
                 {
                     RestoreOriginalParams(mainCam);
-                    _isPortraitMode = false;
                 }
-            }
-            // 如果启用且之前没有保存原始参数，尝试保存（仅在横屏时）
-            else if (_isEnabled && !_hasOriginalParams)
-            {
-                TrySaveOriginalParamsInLandscape();
+                
+                // 只重置状态标记，保留已保存的原始参数
+                // 这样重新启用时不会在竖屏下再次保存参数
+                _isPortraitMode = false;
+                _isInitialized = false;
+                // 注意：不重置 _hasOriginalParams，保留已保存的横屏参数
             }
         }
 
@@ -66,14 +61,20 @@ namespace PotatoOptimization.Features
             if (_isEnabled == enabled) return;
             
             _isEnabled = enabled;
-            if (!enabled && _isPortraitMode)
+            
+            if (!enabled)
             {
+                // 禁用时：恢复相机参数
                 Camera mainCam = Camera.main;
-                if (mainCam != null)
+                if (mainCam != null && _isPortraitMode)
                 {
                     RestoreOriginalParams(mainCam);
-                    _isPortraitMode = false;
                 }
+                
+                // 只重置状态标记，保留已保存的原始参数
+                _isPortraitMode = false;
+                _isInitialized = false;
+                // 注意：不重置 _hasOriginalParams
             }
         }
 
@@ -89,6 +90,33 @@ namespace PotatoOptimization.Features
 
             // 判断当前是否为竖屏 (高度 > 宽度)
             bool currentIsPortrait = Screen.height > Screen.width;
+
+            // 首次Update时进行初始化（确保游戏已完全启动）
+            if (!_isInitialized)
+            {
+                _isInitialized = true;
+                _isPortraitMode = currentIsPortrait;
+                
+                // 只有在没有保存过原始参数时才保存
+                if (!_hasOriginalParams)
+                {
+                    // 保存当前相机参数（无论横屏还是竖屏）
+                    // 因为通过协程延迟或手动启用，此时游戏已完全初始化，参数是稳定的
+                    SaveOriginalParams(mainCam);
+                    PotatoPlugin.Log.LogInfo($"首次初始化: 保存原始参数，当前{(currentIsPortrait ? "竖屏" : "横屏")} {Screen.width}x{Screen.height}");
+                }
+                else
+                {
+                    PotatoPlugin.Log.LogInfo($"重新启用: 使用已保存的原始参数，当前{(currentIsPortrait ? "竖屏" : "横屏")} {Screen.width}x{Screen.height}");
+                }
+                
+                // 如果当前是竖屏且已有原始参数，立即应用调整
+                if (_isPortraitMode && _hasOriginalParams)
+                {
+                    ApplyPortraitAdjustment(mainCam);
+                }
+                return;
+            }
 
             // 状态变化时进行处理
             if (currentIsPortrait != _isPortraitMode)
@@ -189,24 +217,6 @@ namespace PotatoOptimization.Features
             PotatoPlugin.Log.LogInfo($"[竖屏优化] 已应用相对调整:\n" +
                 $"  原始 Pos={originalPos:F4} Rot={originalRot:F4} FOV={originalFov:F2}\n" +
                 $"  调整 Pos={cam.transform.position:F4} Rot={cam.transform.rotation.eulerAngles:F4} FOV={cam.fieldOfView:F2}");
-        }
-
-        private void TrySaveOriginalParamsInLandscape()
-        {
-            Camera mainCam = Camera.main;
-            if (mainCam != null)
-            {
-                // Only save if we're in landscape mode
-                if (Screen.width >= Screen.height)
-                {
-                    SaveOriginalParams(mainCam);
-                    PotatoPlugin.Log.LogInfo("横屏状态下保存原始相机参数");
-                }
-                else
-                {
-                    PotatoPlugin.Log.LogWarning("检测到竖屏状态，将在首次切换到横屏时保存原始参数");
-                }
-            }
         }
 
         private void RestoreOriginalParams(Camera cam)

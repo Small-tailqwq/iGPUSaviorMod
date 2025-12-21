@@ -50,8 +50,8 @@ namespace PotatoOptimization.Configuration
             CfgEnableMirror = _config.Bind("Camera", "EnableMirrorOnStart", false, 
                 "启动时是否自动启用摄像机镜像(默认关闭,建议先用UE Explorer测试)");
             
-            CfgEnablePortraitMode = _config.Bind("Camera", "EnablePortraitMode", true, 
-                "是否启用竖屏优化(检测到竖屏时自动调整相机参数)");
+            CfgEnablePortraitMode = _config.Bind("Camera", "EnablePortraitMode", false, 
+                "启动时是否自动启用竖屏优化(默认关闭,如启用会在游戏初始化后自动激活)");
 
             // 窗口配置
             CfgWindowScale = _config.Bind("Window", "ScaleRatio", WindowScaleRatio.OneThird, 

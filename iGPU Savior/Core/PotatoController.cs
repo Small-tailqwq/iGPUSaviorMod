@@ -38,6 +38,9 @@ namespace PotatoOptimization.Core
                 StartCoroutine(ApplyMirrorOnStart());
             }
 
+            // 竖屏优化不在Start中启用，只在场景加载后启用（确保游戏完全初始化）
+            // 这样可以避免保存游戏初始化时的默认相机位置(0,1,-10)
+
             PotatoPlugin.Log.LogInfo("PotatoController 已启动");
         }
 
@@ -62,7 +65,7 @@ namespace PotatoOptimization.Core
             _audioManager = new AudioManager();
             _renderManager = new RenderQualityManager();
             _mirrorManager = new CameraMirrorManager(_audioManager);
-            _portraitManager = new PortraitModeManager(_config.CfgEnablePortraitMode.Value);
+            _portraitManager = new PortraitModeManager();  // 默认禁用，由协程或用户手动启用
             _windowManager = new WindowStateManager(_config);
         }
 
@@ -133,6 +136,12 @@ namespace PotatoOptimization.Core
             {
                 StartCoroutine(DelayedMirror());
             }
+
+            // 延迟15秒后自动启用竖屏优化（如果开启自动启用）
+            if (_config != null && _config.CfgEnablePortraitMode.Value)
+            {
+                StartCoroutine(DelayedPortraitMode());
+            }
         }
 
         private IEnumerator DelayedMirror()
@@ -140,6 +149,13 @@ namespace PotatoOptimization.Core
             yield return new WaitForSeconds(15f);
             _mirrorManager?.SetMirrorState(true);
             PotatoPlugin.Log.LogWarning($">>> 场景切换后已自动启用摄像机镜像 <<<");
+        }
+
+        private IEnumerator DelayedPortraitMode()
+        {
+            yield return new WaitForSeconds(15f);
+            _portraitManager?.SetEnabled(true);
+            PotatoPlugin.Log.LogWarning($">>> 场景切换后已自动启用竖屏优化 <<<");
         }
 
         /// <summary>
