@@ -29,6 +29,9 @@ namespace PotatoOptimization.Features
             _audioManager = audioManager;
             _lastScreenWidth = Screen.width;
             _lastScreenHeight = Screen.height;
+            
+            // 记录初始屏幕信息，帮助诊断多显示器问题
+            PotatoPlugin.Log.LogInfo($"[镜像管理器] 初始化: 屏幕分辨率 {Screen.width}x{Screen.height}");
         }
 
         /// <summary>

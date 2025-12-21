@@ -40,6 +40,7 @@ namespace PotatoOptimization.Core
         public const float PortraitRotationXMultiplier = 0.83f;
         public const float PortraitRotationYMultiplier = 0.96f;
         public const float PortraitFOVMultiplier = 2.0f;
+        public const float AbnormalCameraPositionThreshold = 1000f;
 
         // ==================== UI 常量 ====================
         public const float MaxVisibleDropdownItems = 6f;
