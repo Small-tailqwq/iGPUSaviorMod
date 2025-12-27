@@ -71,6 +71,15 @@ namespace ModShared
       PotatoOptimization.Core.PotatoPlugin.Log.LogInfo($"[ModManager] Mod 注册: {modName}");
     }
 
+    /// <summary>
+    /// Register a translation key for 3rd party mods.
+    /// Call this BEFORE AddToggle/AddDropdown if you want to use keys.
+    /// </summary>
+    public void RegisterTranslation(string key, string en, string ja, string zh)
+    {
+      PotatoOptimization.UI.ModTranslationManager.Add(key, en, ja, zh);
+    }
+
     // === 兼容性修复：处理 EnvSync 这种未调用 RegisterMod 直接 Add 的情况 ===
     private void EnsureCurrentMod()
     {

@@ -12,22 +12,20 @@ namespace PotatoOptimization.UI
       InitializeTranslations();
     }
 
+    public static void Add(string key, string en, string ja, string zh)
+    {
+      var dict = new Dictionary<GameLanguageType, string>
+              {
+                  { GameLanguageType.English, en },
+                  { GameLanguageType.Japanese, ja },
+                  { GameLanguageType.ChineseSimplified, zh },
+                  { GameLanguageType.ChineseTraditional, zh }
+              };
+      _translations[key] = dict;
+    }
+
     private static void InitializeTranslations()
     {
-      // Helper to modify or add
-      void Add(string key, string en, string ja, string zh)
-      {
-        var dict = new Dictionary<GameLanguageType, string>
-                {
-                    { GameLanguageType.English, en },
-                    { GameLanguageType.Japanese, ja },
-                    { GameLanguageType.ChineseSimplified, zh },
-                    // Fallback for Traditional Chinese to Simplified for now
-                    { GameLanguageType.ChineseTraditional, zh }
-                };
-        _translations[key] = dict;
-      }
-
       // General
       Add("MOD_SETTINGS_TITLE", "MOD Settings", "MOD設定", "MOD 设置");
 
