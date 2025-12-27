@@ -86,6 +86,9 @@
     <Reference Include="UnityEngine.UIModule">
       <HintPath>$(GameDir)\Chill With You_Data\Managed\UnityEngine.UIModule.dll</HintPath>
     </Reference>
+    <Reference Include="VContainer">
+      <HintPath>$(GameDir)\Chill With You_Data\Managed\VContainer.dll</HintPath>
+    </Reference>
   </ItemGroup>
 
   <ItemGroup>
@@ -118,6 +121,8 @@
     <Compile Include="UI\ModSettingsIntegration.cs" />
     <Compile Include="UI\ModToggleCloner.cs" />
     <Compile Include="UI\ModInputFieldCloner.cs" />
+    <Compile Include="UI\Localization\ModLocalizer.cs" />
+    <Compile Include="UI\Localization\ModTranslationManager.cs" />
     
     
     <!-- Properties -->

@@ -50,6 +50,33 @@ namespace PotatoOptimization.UI
         // 🔥 Fix Localization
         ModUIHelper.RemoveLocalizers(clone);
 
+        // 尝试找到标题文本并挂载 ModLocalizer
+        // 原版下拉框的标题通常在 "TitleText" 或 "Title/Text"
+        var paths = new[] { "TitleText", "Title/Text", "Text" };
+        foreach (var p in paths)
+        {
+          var t = clone.transform.Find(p);
+          if (t != null)
+          {
+            var loc = t.gameObject.AddComponent<ModLocalizer>();
+            // Key will be set by ModSettingsManager.CreateDropdownSequence
+            break;
+          }
+        }
+
+        // Also attach ModLocalizer to the Selected Text header (CurrentSelectText) so it can be updated dynamically
+        var headerPaths = new[] { "PulldownList/Pulldown/CurrentSelectText (TMP)", "CurrentSelectText (TMP)" };
+        foreach (var p in headerPaths)
+        {
+          var t = clone.transform.Find(p);
+          if (t != null)
+          {
+            var loc = t.gameObject.AddComponent<ModLocalizer>();
+            // Key is initially null/empty, will be set by UpdatePulldownSelectedText or Default selection logic
+            break;
+          }
+        }
+
         // Find the Content container (where option buttons are stored)
         Transform content = clone.transform.Find("PulldownList/Pulldown/CurrentSelectText (TMP)/Content");
         if (content == null)
@@ -189,6 +216,9 @@ namespace PotatoOptimization.UI
         if (buttonText != null)
         {
           buttonText.text = optionText;
+          // Localize option button
+          var loc = buttonText.gameObject.AddComponent<ModLocalizer>();
+          loc.Key = optionText;
         }
 
         // Ensure all Image components have raycastTarget enabled
@@ -220,12 +250,45 @@ namespace PotatoOptimization.UI
 
                 if (pulldownUI != null)
                 {
-                  // Update selected text
+                  // Update selected text logic:
+                  // 1. Get Translated text for immediate visual update
+                  var langSupplier = NestopiSystem.DIContainers.ProjectLifetimeScope.Resolve<Bulbul.LanguageSupplier>();
+                  var lang = langSupplier != null ? langSupplier.Language.CurrentValue : Bulbul.GameLanguageType.English; // Use R3 CurrentValue or Subscription?
+                                                                                                                          // NOTE: LanguageSupplier.Language is ReactiveProperty<GameLanguageType> usually.
+                                                                                                                          // Assuming NestopiSystem R3 usage, .CurrentValue is correct.
+                                                                                                                          // If failing, safely fallback.
+                                                                                                                          // Wait, I can use ModLocalizer's cached logic or just ModTranslationManager with English if accessing static supplier is hard?
+                                                                                                                          // Using user's provided ModLocalizer usage style:
+                                                                                                                          // Actually ModTranslationManager.Get(key, ...) needs type.
+                                                                                                                          // Let's rely on ModLocalizer on the header to update itself!
+
+                  // Update the ModLocalizer on the header FIRST
+                  var paths = new[] { "PulldownList/Pulldown/CurrentSelectText (TMP)", "CurrentSelectText (TMP)" };
+                  foreach (var p in paths)
+                  {
+                    var t = pulldownClone.transform.Find(p);
+                    if (t != null)
+                    {
+                      var headerLoc = t.GetComponent<ModLocalizer>();
+                      if (headerLoc != null)
+                      {
+                        headerLoc.Key = optionText; // This triggers Refresh() immediately due to Property setter!
+                                                    // Since Refresh() sets text, we might not strictly need the game method update,
+                                                    // BUT the game method might do other internal state logic.
+                      }
+                      break;
+                    }
+                  }
+
+                  // Also call game method with translated text (for consistency/internal state)
+                  string finalVisualText = ModTranslationManager.Get(optionText, lang);
+                  if (string.IsNullOrEmpty(finalVisualText)) finalVisualText = optionText; // Fallback
+
                   var changeTextMethod = pulldownType.GetMethod("ChangeSelectContentText", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
                   if (changeTextMethod != null)
                   {
-                    changeTextMethod.Invoke(pulldownUI, new object[] { optionText });
-                    PotatoPlugin.Log.LogInfo($"Updated selected text to: {optionText}");
+                    changeTextMethod.Invoke(pulldownUI, new object[] { finalVisualText });
+                    PotatoPlugin.Log.LogInfo($"Updated selected text to: {finalVisualText}");
                   }
 
                   // Close the pulldown

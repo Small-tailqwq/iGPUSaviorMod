@@ -58,6 +58,10 @@ namespace PotatoOptimization.UI
         // 🔥🔥🔥 关键修复：移除本地化组件，防止翻译被覆盖 🔥🔥🔥
         RemoveLocalizers(toggleRow);
 
+        // ✅ 挂载自定义本地化组件
+        var localizer = toggleRow.AddComponent<ModLocalizer>();
+        localizer.Key = labelText; // Use labelText as the localization key
+
         // 3. 【改字】修改左边的标题
         // 标题通常叫 "TitleText", "Text", "Name" 或者就是第一个 TextMeshPro 组件
         var titleTexts = toggleRow.GetComponentsInChildren<TMP_Text>(true);

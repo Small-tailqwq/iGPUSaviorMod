@@ -85,6 +85,32 @@ namespace PotatoOptimization.UI
         modInteractableUI?.Setup();
         modTabButton.GetComponent<Button>()?.onClick.AddListener(() => SwitchToModTab(settingUI));
 
+        // === 修复 Localization：移除原版翻译组件，防止语言切换时变回 Credits ===
+        ModUIHelper.RemoveLocalizers(modTabButton);
+
+        // 挂载我们自己的 Localizer
+        // 找到 Button 下的 Text (通常是 Text 或 TextMeshPro)
+        var btnText = modTabButton.GetComponentInChildren<TMP_Text>(true);
+        if (btnText != null)
+        {
+          var loc = btnText.gameObject.AddComponent<ModLocalizer>();
+          loc.Key = "MOD_SETTINGS_TITLE";
+        }
+        else
+        {
+          // Fallback if no TMP, look for Text
+          var legacyText = modTabButton.GetComponentInChildren<Text>(true);
+          if (legacyText != null)
+          {
+            // Replace Legacy Text with TMP ? Or just set text.
+            // Ideally we want ModLocalizer which works with TMP.
+            // If the game uses Legacy Text here, we might need a ModLocalizerLegacy or just manual update.
+            // Assuming game uses TMP given previous code searches.
+          }
+        }
+
+
+
         // === 修复 UI 溢出问题：限制按钮宽度 ===
         var le = modTabButton.GetComponent<LayoutElement>();
         if (le == null) le = modTabButton.AddComponent<LayoutElement>();
@@ -103,45 +129,45 @@ namespace PotatoOptimization.UI
 
     static void ConfigureContentLayout(GameObject content)
     {
-        // =========================================================
-        // 第一步：配置内部 Content (列表容器)
-        // =========================================================
-        var contentRect = content.GetComponent<RectTransform>();
-        if (contentRect != null)
-        {
-            contentRect.anchorMin = new Vector2(0, 1);
-            contentRect.anchorMax = new Vector2(1, 1);
-            contentRect.pivot = new Vector2(0.5f, 1f);
-            contentRect.anchoredPosition = Vector2.zero;
-            contentRect.sizeDelta = new Vector2(0, 0);
-            contentRect.localScale = Vector3.one;
-        }
+      // =========================================================
+      // 第一步：配置内部 Content (列表容器)
+      // =========================================================
+      var contentRect = content.GetComponent<RectTransform>();
+      if (contentRect != null)
+      {
+        contentRect.anchorMin = new Vector2(0, 1);
+        contentRect.anchorMax = new Vector2(1, 1);
+        contentRect.pivot = new Vector2(0.5f, 1f);
+        contentRect.anchoredPosition = Vector2.zero;
+        contentRect.sizeDelta = new Vector2(0, 0);
+        contentRect.localScale = Vector3.one;
+      }
 
-        // 添加列表布局控制
-        var vGroup = content.GetComponent<VerticalLayoutGroup>() ?? content.AddComponent<VerticalLayoutGroup>();
-        vGroup.spacing = 16f;
-        vGroup.padding = new RectOffset(10, 40, 20, 20); // 左, 右, 上, 下
-        vGroup.childAlignment = TextAnchor.UpperLeft;
-        vGroup.childControlHeight = false;
-        vGroup.childControlWidth = true;
-        vGroup.childForceExpandHeight = false;
-        vGroup.childForceExpandWidth = true;
+      // 添加列表布局控制
+      var vGroup = content.GetComponent<VerticalLayoutGroup>() ?? content.AddComponent<VerticalLayoutGroup>();
+      vGroup.spacing = 16f;
+      vGroup.padding = new RectOffset(10, 40, 20, 20); // 左, 右, 上, 下
+      vGroup.childAlignment = TextAnchor.UpperLeft;
+      vGroup.childControlHeight = false;
+      vGroup.childControlWidth = true;
+      vGroup.childForceExpandHeight = false;
+      vGroup.childForceExpandWidth = true;
 
-        var fitter = content.GetComponent<ContentSizeFitter>() ?? content.AddComponent<ContentSizeFitter>();
-        fitter.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
-        fitter.horizontalFit = ContentSizeFitter.FitMode.Unconstrained;
-var scrollRect = content.GetComponentInParent<ScrollRect>();
-    if (scrollRect != null)
-    {
+      var fitter = content.GetComponent<ContentSizeFitter>() ?? content.AddComponent<ContentSizeFitter>();
+      fitter.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
+      fitter.horizontalFit = ContentSizeFitter.FitMode.Unconstrained;
+      var scrollRect = content.GetComponentInParent<ScrollRect>();
+      if (scrollRect != null)
+      {
         // ==============================================================
         // 👇👇👇 你的 Diff 里缺少了这一段核心代码 👇👇👇
         // ==============================================================
         var rootObj = scrollRect.transform.parent.gameObject;
-        
+
         // 必须立刻销毁根物体上的布局组件，否则它会无视你的设置，强制把 ScrollView 拉伸到全屏
         var rootLayout = rootObj.GetComponent<VerticalLayoutGroup>();
         if (rootLayout != null) UnityEngine.Object.DestroyImmediate(rootLayout);
-        
+
         var rootHLayout = rootObj.GetComponent<HorizontalLayoutGroup>();
         if (rootHLayout != null) UnityEngine.Object.DestroyImmediate(rootHLayout);
         // ==============================================================
@@ -149,7 +175,7 @@ var scrollRect = content.GetComponentInParent<ScrollRect>();
         // ==============================================================
 
         var scrollRectTransform = scrollRect.GetComponent<RectTransform>();
-        
+
         // 确保它是全屏拉伸的锚点
         scrollRectTransform.anchorMin = Vector2.zero;
         scrollRectTransform.anchorMax = Vector2.one;
@@ -157,27 +183,27 @@ var scrollRect = content.GetComponentInParent<ScrollRect>();
 
         // 设置边距 (Left, Bottom, Right, Top)
         scrollRectTransform.offsetMin = new Vector2(50f, 50f);
-        
+
         // 这里的数值必须是负数，Top=-150 才能把顶部空出来
         scrollRectTransform.offsetMax = new Vector2(-50f, -150f);
-        
+
         PotatoPlugin.Log.LogInfo($"[UI Fix] Constrained ScrollView window: Top=-150, Bottom=50");
-        
+
         // 顺便修复 Viewport
         if (scrollRect.viewport != null)
         {
-            scrollRect.viewport.anchorMin = Vector2.zero;
-            scrollRect.viewport.anchorMax = Vector2.one;
-            scrollRect.viewport.sizeDelta = Vector2.zero;
-            scrollRect.viewport.anchoredPosition = Vector2.zero;
-            
-            // 确保有遮罩 (Credits 界面默认可能没有 RectMask2D)
-            if (scrollRect.viewport.GetComponent<RectMask2D>() == null)
-            {
-                 scrollRect.viewport.gameObject.AddComponent<RectMask2D>();
-            }
+          scrollRect.viewport.anchorMin = Vector2.zero;
+          scrollRect.viewport.anchorMax = Vector2.one;
+          scrollRect.viewport.sizeDelta = Vector2.zero;
+          scrollRect.viewport.anchoredPosition = Vector2.zero;
+
+          // 确保有遮罩 (Credits 界面默认可能没有 RectMask2D)
+          if (scrollRect.viewport.GetComponent<RectMask2D>() == null)
+          {
+            scrollRect.viewport.gameObject.AddComponent<RectMask2D>();
+          }
         }
-        }
+      }
     }
 
     // === 新增的强力修复方法 (请添加到类中) ===
@@ -249,23 +275,23 @@ var scrollRect = content.GetComponentInParent<ScrollRect>();
 
         manager.RegisterMod("iGPU Savior", PotatoOptimization.Core.Constants.PluginVersion);
 
-        manager.AddToggle("镜像自启动", PotatoPlugin.Config.CfgEnableMirror.Value, val =>
+        manager.AddToggle("SETTING_MIRROR_AUTO", PotatoPlugin.Config.CfgEnableMirror.Value, val =>
         {
           PotatoPlugin.Config.CfgEnableMirror.Value = val;
           Object.FindObjectOfType<PotatoController>()?.SetMirrorState(val);
         });
 
-        manager.AddToggle("竖优自启动", PotatoPlugin.Config.CfgEnablePortraitMode.Value, val =>
+        manager.AddToggle("SETTING_PORTRAIT_AUTO", PotatoPlugin.Config.CfgEnablePortraitMode.Value, val =>
         {
           PotatoPlugin.Config.CfgEnablePortraitMode.Value = val;
           PotatoPlugin.Log.LogInfo($"竖屏优化自启动已设置为: {val}");
         });
 
-        manager.AddDropdown("小窗缩放", new List<string> { "1/3", "1/4", "1/5" },
+        manager.AddDropdown("SETTING_MINI_SCALE", new List<string> { "1/3", "1/4", "1/5" },
                   (int)PotatoPlugin.Config.CfgWindowScale.Value - 3,
                   index => PotatoPlugin.Config.CfgWindowScale.Value = (WindowScaleRatio)(index + 3));
 
-        manager.AddDropdown("小窗拖动模式", new List<string> { "Ctrl + 左键", "Alt + 左键", "右键按住" },
+        manager.AddDropdown("SETTING_DRAG_MODE", new List<string> { "DRAG_MODE_CTRL", "DRAG_MODE_ALT", "DRAG_MODE_RIGHT" },
                   (int)PotatoPlugin.Config.CfgDragMode.Value,
                   index => PotatoPlugin.Config.CfgDragMode.Value = (DragMode)index);
 
@@ -273,17 +299,17 @@ var scrollRect = content.GetComponentInParent<ScrollRect>();
         int GetKeyIndex(KeyCode key) { int i = key - KeyCode.F1; return (i >= 0 && i < 12) ? i : 0; }
         KeyCode GetKey(int i) { return KeyCode.F1 + i; }
 
-        manager.AddDropdown("土豆模式快捷键", keyOptions, GetKeyIndex(PotatoPlugin.Config.KeyPotatoMode.Value),
+        manager.AddDropdown("SETTING_KEY_POTATO", keyOptions, GetKeyIndex(PotatoPlugin.Config.KeyPotatoMode.Value),
                   i => PotatoPlugin.Config.KeyPotatoMode.Value = GetKey(i));
-        manager.AddDropdown("小窗模式快捷键", keyOptions, GetKeyIndex(PotatoPlugin.Config.KeyPiPMode.Value),
+        manager.AddDropdown("SETTING_KEY_PIP", keyOptions, GetKeyIndex(PotatoPlugin.Config.KeyPiPMode.Value),
                   i => PotatoPlugin.Config.KeyPiPMode.Value = GetKey(i));
-        manager.AddDropdown("镜像模式快捷键", keyOptions, GetKeyIndex(PotatoPlugin.Config.KeyCameraMirror.Value),
+        manager.AddDropdown("SETTING_KEY_MIRROR", keyOptions, GetKeyIndex(PotatoPlugin.Config.KeyCameraMirror.Value),
                   i => PotatoPlugin.Config.KeyCameraMirror.Value = GetKey(i));
 
         // 测试：把 KeyPortraitMode 作为文本框显示
         // 逻辑：读取当前 Config -> 转 string 显示 -> 用户输入 -> 存入 string (不做校验，用户输错了是用户的事)
         manager.AddInputField(
-    "竖屏优化快捷键",  // labelText
+    "SETTING_KEY_PORTRAIT",  // labelText
     PotatoPlugin.Config.KeyPortraitMode.Value.ToString(),  // defaultValue
     (string val) =>  // onValueChanged (明确指定类型)
     {
