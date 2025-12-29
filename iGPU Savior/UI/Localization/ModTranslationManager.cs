@@ -49,6 +49,11 @@ namespace PotatoOptimization.UI
       Add("DRAG_MODE_CTRL", "Ctrl + Left Click", "Ctrl + 左クリック", "Ctrl + 左键");
       Add("DRAG_MODE_ALT", "Alt + Left Click", "Alt + 左クリック", "Alt + 左键");
       Add("DRAG_MODE_RIGHT", "Right Key Hold", "右クリックホールド", "右键按住");
+
+      // Todo Delete Confirmation
+      Add("TODO_DELETE_CONFIRM_PROMPT", "Are you sure you want to delete this task?", "このタスクを削除してもよろしいですか？", "确定要删除此待办事项吗？");
+      Add("TODO_DELETE_CONFIRM_OK", "Confirm", "確定", "确定");
+      Add("TODO_DELETE_CONFIRM_CANCEL", "Cancel", "キャンセル", "取消");
     }
 
     public static string Get(string key, GameLanguageType lang)

@@ -25,17 +25,23 @@ namespace PotatoOptimization.UI
     {
       try
       {
+        PotatoPlugin.Log.LogInfo("[ModSettings] Setup Postfix called");
         cachedSettingUI = __instance;
         _rootCanvas = __instance.GetComponentInParent<Canvas>() ?? Object.FindObjectOfType<Canvas>();
+        PotatoPlugin.Log.LogInfo($"[ModSettings] Canvas found: {_rootCanvas != null}");
 
         CreateModSettingsTab(__instance);
+        PotatoPlugin.Log.LogInfo($"[ModSettings] Tab created, modContentParent: {modContentParent != null}");
+        
         HookIntoTabButtons(__instance);
+        PotatoPlugin.Log.LogInfo("[ModSettings] Tab buttons hooked");
 
         modContentParent?.SetActive(false);
+        PotatoPlugin.Log.LogInfo("[ModSettings] Setup completed successfully");
       }
       catch (System.Exception e)
       {
-        PotatoPlugin.Log.LogError($"MOD integration failed: {e.Message}\n{e.StackTrace}");
+        PotatoPlugin.Log.LogError($"[ModSettings] Integration failed: {e.Message}\n{e.StackTrace}");
       }
     }
 

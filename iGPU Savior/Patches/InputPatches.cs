@@ -17,18 +17,22 @@ namespace PotatoOptimization.Patches
         /// </summary>
         public static bool IsInputMirrored { get; set; } = false;
 
+        // 拖拽场景下的判定缓存：按下时是否位于 UI
+        private static bool _isPointerDown;
+        private static bool _pressedOverUI;
+
         static void Postfix(ref Vector3 __result)
         {
+            // 捕获按下/抬起状态，锁定拖拽周期内的判定来源
+            UpdatePointerState(__result);
+
             // 仅在镜像模式启用时处理
             if (!IsInputMirrored)
                 return;
 
-            // 检测鼠标下是否有 UI 元素
-            if (IsPointerOverUI(__result))
-            {
-                // 鼠标在 UI 上，不翻转（UI 本身没有镜像）
+            bool allowMirror = ShouldMirror(__result);
+            if (!allowMirror)
                 return;
-            }
 
             // 鼠标在 3D 场景上，翻转坐标
             __result = new Vector3(
@@ -36,6 +40,45 @@ namespace PotatoOptimization.Patches
                 __result.y,                   // Y 保持不变
                 __result.z                    // Z 保持不变
             );
+        }
+
+        /// <summary>
+        /// 根据按下瞬间的命中结果，锁定整个拖拽流程的镜像规则
+        /// </summary>
+        private static bool ShouldMirror(Vector3 mousePosition)
+        {
+            if (!_isPointerDown)
+            {
+                // 未拖拽时保持原逻辑：UI 不镜像，场景镜像
+                return !IsPointerOverUI(mousePosition);
+            }
+
+            // 拖拽中：沿用按下时的命中结果
+            return !_pressedOverUI;
+        }
+
+        /// <summary>
+        /// 记录按下/抬起事件，避免拖拽过程中因 UI 状态切换导致镜像跳变
+        /// </summary>
+        private static void UpdatePointerState(Vector3 mousePosition)
+        {
+            bool pressedThisFrame = Input.GetMouseButtonDown(0) || Input.GetMouseButtonDown(1) || Input.GetMouseButtonDown(2);
+            if (pressedThisFrame)
+            {
+                _pressedOverUI = IsPointerOverUI(mousePosition);
+                _isPointerDown = true;
+            }
+
+            bool releasedThisFrame = Input.GetMouseButtonUp(0) || Input.GetMouseButtonUp(1) || Input.GetMouseButtonUp(2);
+            if (releasedThisFrame)
+            {
+                // 只有当所有鼠标按钮都释放时才退出拖拽状态
+                bool anyButtonStillPressed = Input.GetMouseButton(0) || Input.GetMouseButton(1) || Input.GetMouseButton(2);
+                if (!anyButtonStillPressed)
+                {
+                    _isPointerDown = false;
+                }
+            }
         }
 
         /// <summary>

@@ -4,6 +4,7 @@ using BepInEx.Logging;
 using HarmonyLib;
 using UnityEngine;
 using PotatoOptimization.Configuration;
+using PotatoOptimization.Patches;
 
 namespace PotatoOptimization.Core
 {
@@ -43,6 +44,11 @@ namespace PotatoOptimization.Core
     {
       try
       {
+        // 强制加载补丁类到内存中，确保它们的静态构造函数被执行
+        // 这很重要，因为 Harmony.PatchAll() 只能扫描已加载的类
+        var todoDeleteConfirmType = typeof(TodoDeleteConfirmPatch);
+        Log.LogWarning($"[Patch Init] Loaded TodoDeleteConfirmPatch: {todoDeleteConfirmType.FullName}");
+        
         var harmony = new Harmony(Constants.PluginGUID);
         harmony.PatchAll();
         Log.LogWarning(">>> Harmony patches applied successfully! <<<");

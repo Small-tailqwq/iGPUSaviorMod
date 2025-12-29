@@ -114,6 +114,7 @@
     
     <!-- Patches -->
     <Compile Include="Patches\InputPatches.cs" />
+    <Compile Include="Patches\TodoDeleteConfirmPatch.cs" />
     
     <!-- UI -->
     <Compile Include="UI\ModPulldownCloner.cs" />
