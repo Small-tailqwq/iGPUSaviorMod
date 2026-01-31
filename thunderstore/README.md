@@ -9,7 +9,7 @@
 
 ---
 
-[![Chill with You](./img/header_schinese.jpg)](https://store.steampowered.com/app/3548580/)
+[![Chill with You](https://raw.githubusercontent.com/Small-tailqwq/iGPUSaviorMod/refs/heads/master/img/header_schinese.jpg)](https://store.steampowered.com/app/3548580/)
 
 > 「放松时光：与你共享Lo-Fi故事」是一个与喜欢写故事的女孩聪音一起工作的有声小说游戏。您可以自定义艺术家的原创乐曲、环境音和风景，以营造一个专注于工作的环境。在与聪音的关系加深的过程中，您可能会发现与她之间的特别联系。
 ---
@@ -26,7 +26,7 @@
 
 ## 快速演示
 
-![Steam 论坛演示](./img/ptt4.png)
+![Steam 论坛演示](https://raw.githubusercontent.com/Small-tailqwq/iGPUSaviorMod/refs/heads/master/img/ptt4.png)
 <p align="center"><i>在 Steam 社区发帖的同时，用小窗观看游戏画面</i></p>
 
 #### ⚡ 性能优化
@@ -34,10 +34,10 @@
 
 **内存占用对比：**
 
-![优化前内存占用](./img/mmr1.png)
+![优化前内存占用](https://raw.githubusercontent.com/Small-tailqwq/iGPUSaviorMod/refs/heads/master/img/mmr1.png)
 <p align="center"><i>优化前：内存占用 1,134.8 MB</i></p>
 
-![优化后内存占用](./img/mmr2.png)
+![优化后内存占用](https://raw.githubusercontent.com/Small-tailqwq/iGPUSaviorMod/refs/heads/master/img/mmr2.png)
 <p align="center"><i>优化后：内存占用 459.5 MB</i></p>
 
 - 优化前：1,134.8 MB
@@ -46,10 +46,10 @@
 
 **GPU 占用对比：**
 
-![优化前 GPU 占用](./img/ptt3.png)
+![优化前 GPU 占用](https://raw.githubusercontent.com/Small-tailqwq/iGPUSaviorMod/refs/heads/master/img/ptt3.png)
 <p align="center"><i>优化前：3D 占用率 43%，持续高负载</i></p>
 
-![优化后 GPU 占用](./img/ptt2.png)
+![优化后 GPU 占用](https://raw.githubusercontent.com/Small-tailqwq/iGPUSaviorMod/refs/heads/master/img/ptt2.png)
 <p align="center"><i>优化后：3D 占用率 16%，显著降低</i></p>
 
 - 优化前：3D 占用率 43%，持续高负载

@@ -1,0 +1,9 @@
+{
+    "name": "iGPU_Savior",
+    "version_number": "1.7.3",
+    "website_url": "https://github.com/Small-tailqwq/iGPUSaviorMod",
+    "description": "性能和体验优化插件，不可以让你的土豆电脑的风扇不转，我试过了。但是可以给你提供一个不错的镜像、小窗、竖屏模式。",
+    "dependencies": [
+        "BepInEx-BepInExPack-5.4.2304"
+    ]
+}
