@@ -371,6 +371,17 @@ namespace ModShared
       le.flexibleWidth = 1f;
 
       var tmp = obj.AddComponent<TextMeshProUGUI>();
+      
+      // ✅ 修复：分配原版游戏的字体，防止找不到默认字体导致 LayoutRebuilder 空指针异常
+      if (_settingUIRoot != null)
+      {
+        var existingText = _settingUIRoot.GetComponentInChildren<TMP_Text>(true);
+        if (existingText != null && existingText.font != null)
+        {
+          tmp.font = existingText.font;
+        }
+      }
+
       string verStr = string.IsNullOrEmpty(version) ? "" : $" <size=18><color=#888888>v{version}</color></size>";
       tmp.text = $"<size=24><b>{name}</b></size>{verStr}";
       tmp.alignment = TextAlignmentOptions.BottomLeft;

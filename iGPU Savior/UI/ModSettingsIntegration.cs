@@ -312,25 +312,8 @@ namespace PotatoOptimization.UI
         manager.AddDropdown("SETTING_KEY_MIRROR", keyOptions, GetKeyIndex(PotatoPlugin.Config.KeyCameraMirror.Value),
                   i => PotatoPlugin.Config.KeyCameraMirror.Value = GetKey(i));
 
-        // 测试：把 KeyPortraitMode 作为文本框显示
-        // 逻辑：读取当前 Config -> 转 string 显示 -> 用户输入 -> 存入 string (不做校验，用户输错了是用户的事)
-        manager.AddInputField(
-    "SETTING_KEY_PORTRAIT",  // labelText
-    PotatoPlugin.Config.KeyPortraitMode.Value.ToString(),  // defaultValue
-    (string val) =>  // onValueChanged (明确指定类型)
-    {
-      try
-      {
-        KeyCode newKey = (KeyCode)System.Enum.Parse(typeof(KeyCode), val.ToUpper());
-        PotatoPlugin.Config.KeyPortraitMode.Value = newKey;
-        PotatoPlugin.Log.LogInfo($"Portrait key updated to: {newKey}");
-      }
-      catch
-      {
-        PotatoPlugin.Log.LogWarning($"Invalid KeyCode: '{val}', ignored");
-      }
-    }
-);
+        manager.AddDropdown("SETTING_KEY_PORTRAIT", keyOptions, GetKeyIndex(PotatoPlugin.Config.KeyPortraitMode.Value),
+                  i => PotatoPlugin.Config.KeyPortraitMode.Value = GetKey(i));
 
         var scrollRect = modContentParent.GetComponentInChildren<ScrollRect>();
         if (scrollRect != null)
@@ -403,38 +386,42 @@ namespace PotatoOptimization.UI
 
     static void AdjustTabBarLayout(Transform tabBarParent)
     {
-      // === 修复 UI 溢出问题：幽灵模式 (Sidecar) ===
-
-      // 1. 彻底撤销对 HorizontalLayoutGroup 的修改
-      // 让原版游戏逻辑去接管那 4 个按钮，这样它们就会恢复正常，不再挤成一团
-      var hlg = tabBarParent.GetComponent<HorizontalLayoutGroup>();
-      if (hlg != null)
-      {
-        PotatoPlugin.Log.LogInfo($"[UI Fix] Reverting HorizontalLayoutGroup changes.");
-        // 下面这些属性如果被我改坏了，尝试改回默认比较安全的设置
-        // 假设原版是 true? 或者 false? 
-        // 最安全的方法是：根本不碰它。
-        // 但因为之前版本可能已经持久化修改了（虽然是内存中），为防万一，我们重置一下
-        // 根据“制\n作”换行，说明宽度太窄。
-        // 尝试恢复 childForceExpandWidth = true (通常顶栏按钮需要铺满)
-        hlg.childForceExpandWidth = true; // 或者是原版默认值
-        hlg.spacing = 0f;
-        if (hlg.padding != null) { hlg.padding.left = 0; hlg.padding.right = 0; }
-      }
-
-      // 2. 也不需要调整 Parent 的 SizeDelta 了，除非真的太窄
-      // 用户之前的图看，其实位置偏移 -90 还是有用的，保留
+      // === 修复 UI 溢出问题：原版加上 MOD 按钮后超出了屏幕宽度 ===
+      // 我们在此让顶部的所有分类标签自适应变窄（通过强制约束 HorizontalLayoutGroup 和总宽度）
+      
       var rectTransform = tabBarParent.GetComponent<RectTransform>();
       if (rectTransform != null)
       {
-        // 仍然左移，保持视觉居中
-        var currentPos = rectTransform.anchoredPosition;
-        // 简单的防止无限左移逻辑：假设初值肯定大于 -400 (用户原值 -378)
-        // if (currentPos.x > -400) 
-        rectTransform.anchoredPosition = new Vector2(currentPos.x - 90f, currentPos.y);
+        // 1. 移除可能存在的尺寸自适应组件，防止父容器随着按钮增多无限制横向膨胀
+        var fitter = tabBarParent.GetComponent<ContentSizeFitter>();
+        if (fitter != null)
+        {
+          UnityEngine.Object.DestroyImmediate(fitter);
+        }
+
+        // 2. 将此栏框的总宽度锁死在安全尺寸内（1140 刚好能在滚动视图内完美容纳，原为 1189 导致越界）
+        rectTransform.sizeDelta = new Vector2(1140f, rectTransform.sizeDelta.y);
+
+        // 3. 将之前错误的偏移动画修正回居中偏左一点的位置。不再沿用 `-90f` 导致第一项（常规）被遮挡切角的旧版逻辑
+        rectTransform.anchoredPosition = new Vector2(15f, rectTransform.anchoredPosition.y);
       }
 
-      // 没有任何 ForceRebuild，让 Unity 自己算
+      var hlg = tabBarParent.GetComponent<HorizontalLayoutGroup>();
+      if (hlg != null)
+      {
+        PotatoPlugin.Log.LogInfo($"[UI Fix] Applying adaptive HorizontalLayoutGroup for tabs.");
+        // 第四步极其重要：告诉 Unity LayoutGroup：你现在有支配底下 6 个按钮缩放和拉伸的终极权限。
+        // 它会根据总长自动将原先的按钮等比率（只缩小了不到 4%）压缩，以此适应我们刚刚指定的 1140 宽度。
+        hlg.childControlWidth = true; 
+        hlg.childForceExpandWidth = true;
+        hlg.spacing = 2f; 
+        
+        if (hlg.padding != null) 
+        { 
+          hlg.padding.left = 0; 
+          hlg.padding.right = 0; 
+        }
+      }
     }
 
     static void ConfigureGhostButton(GameObject modBtn)
@@ -467,35 +454,44 @@ namespace PotatoOptimization.UI
 
     private static void HookIntoTabButtons(SettingUI settingUI)
     {
-      var buttons = new[] { "_generalInteractableUI", "_graphicInteractableUI", "_audioInteractableUI", "_creditsInteractableUI" };
-      var parents = new[] { "_generalParent", "_graphicParent", "_audioParent", "_creditsParent" };
-      for (int i = 0; i < buttons.Length; i++)
+      var allFields = AccessTools.GetDeclaredFields(typeof(SettingUI));
+      var interactableFields = allFields.Where(f => f.FieldType == typeof(InteractableUI) && f.Name.EndsWith("InteractableUI"));
+
+      foreach (var fBtn in interactableFields)
       {
-        var btn = AccessTools.Field(typeof(SettingUI), buttons[i]).GetValue(settingUI) as InteractableUI;
-        var parent = AccessTools.Field(typeof(SettingUI), parents[i]).GetValue(settingUI) as GameObject;
-        if (btn != null)
+        var prefix = fBtn.Name.Replace("InteractableUI", "");
+        var fParent = allFields.FirstOrDefault(f => f.Name == prefix + "Parent" && f.FieldType == typeof(GameObject));
+
+        if (fParent != null)
         {
-          var capturedBtn = btn;
-          var capturedParent = parent;
-          btn.GetComponent<Button>()?.onClick.AddListener(() =>
+          var capturedBtn = fBtn.GetValue(settingUI) as InteractableUI;
+          var capturedParent = fParent.GetValue(settingUI) as GameObject;
+
+          if (capturedBtn != null && capturedParent != null)
           {
-            modContentParent?.SetActive(false);
-            modInteractableUI?.DeactivateUseUI(false);
-            if (capturedParent) { capturedParent.SetActive(true); capturedBtn.ActivateUseUI(false); }
-          });
+            capturedBtn.GetComponent<Button>()?.onClick.AddListener(() =>
+            {
+              modContentParent?.SetActive(false);
+              modInteractableUI?.DeactivateUseUI(false);
+              capturedParent.SetActive(true);
+              capturedBtn.ActivateUseUI(false);
+            });
+          }
         }
       }
     }
 
     private static void SwitchToModTab(SettingUI settingUI)
     {
-      var parents = new[] { "_generalParent", "_graphicParent", "_audioParent", "_creditsParent" };
-      foreach (var p in parents)
-        (AccessTools.Field(typeof(SettingUI), p).GetValue(settingUI) as GameObject)?.SetActive(false);
+      var allFields = AccessTools.GetDeclaredFields(typeof(SettingUI));
 
-      var buttons = new[] { "_generalInteractableUI", "_graphicInteractableUI", "_audioInteractableUI", "_creditsInteractableUI" };
-      foreach (var b in buttons)
-        (AccessTools.Field(typeof(SettingUI), b).GetValue(settingUI) as InteractableUI)?.DeactivateUseUI(false);
+      // 关闭原版游戏目前存在的所有标签内容页
+      foreach (var fParent in allFields.Where(f => f.FieldType == typeof(GameObject) && f.Name.EndsWith("Parent")))
+        (fParent.GetValue(settingUI) as GameObject)?.SetActive(false);
+
+      // 取消原版游戏目前存在的所有标签按钮的激活高亮状态
+      foreach (var fBtn in allFields.Where(f => f.FieldType == typeof(InteractableUI) && f.Name.EndsWith("InteractableUI")))
+        (fBtn.GetValue(settingUI) as InteractableUI)?.DeactivateUseUI(false);
 
       OnOpenModTab();
       modInteractableUI?.ActivateUseUI(false);
@@ -576,9 +572,20 @@ namespace PotatoOptimization.UI
         generalButton?.ActivateUseUI(false);
         generalParent?.SetActive(true);
 
-        var others = new[] { "_graphicParent", "_audioParent", "_creditsParent" };
-        foreach (var o in others)
-          (AccessTools.Field(typeof(SettingUI), o).GetValue(__instance) as GameObject)?.SetActive(false);
+        var allFields = AccessTools.GetDeclaredFields(typeof(SettingUI));
+        
+        // 当打开菜单时，动态关闭所有除非 General 以外的其他原版标签页
+        foreach (var fParent in allFields.Where(f => f.FieldType == typeof(GameObject) && f.Name.EndsWith("Parent")))
+        {
+            var p = fParent.GetValue(__instance) as GameObject;
+            if (fParent.Name != "_generalParent") p?.SetActive(false);
+        }
+
+        foreach (var fBtn in allFields.Where(f => f.FieldType == typeof(InteractableUI) && f.Name.EndsWith("InteractableUI")))
+        {
+            var b = fBtn.GetValue(__instance) as InteractableUI;
+            if (fBtn.Name != "_generalInteractableUI") b?.DeactivateUseUI(false);
+        }
       }
       catch { }
     }
