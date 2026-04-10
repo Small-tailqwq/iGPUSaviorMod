@@ -32,6 +32,7 @@ namespace PotatoOptimization.UI
       // Toggles
       Add("SETTING_MIRROR_AUTO", "Mirror Auto-Start", "ミラー自動起動", "镜像自启动");
       Add("SETTING_PORTRAIT_AUTO", "Portrait Auto-Start", "縦画面自動起動", "竖屏优化自启动");
+      Add("SETTING_DELETE_CONFIRM", "Delete Confirmation", "削除確認", "删除二次确认");
 
       // Dropdowns
       Add("SETTING_MINI_SCALE", "Mini Window Scale", "小窓スケール", "小窗缩放");
@@ -54,6 +55,9 @@ namespace PotatoOptimization.UI
       Add("TODO_DELETE_CONFIRM_PROMPT", "Are you sure you want to delete this task?", "このタスクを削除してもよろしいですか？", "确定要删除此待办事项吗？");
       Add("TODO_DELETE_CONFIRM_OK", "Confirm", "確定", "确定");
       Add("TODO_DELETE_CONFIRM_CANCEL", "Cancel", "キャンセル", "取消");
+
+      // Note Delete Confirmation
+      Add("NOTE_DELETE_CONFIRM_PROMPT", "Are you sure you want to delete this note?", "このノートを削除してもよろしいですか？", "确定要删除这页笔记吗？");
     }
 
     public static string Get(string key, GameLanguageType lang)

@@ -48,6 +48,9 @@ namespace PotatoOptimization.Core
         // 这很重要，因为 Harmony.PatchAll() 只能扫描已加载的类
         var todoDeleteConfirmType = typeof(TodoDeleteConfirmPatch);
         Log.LogWarning($"[Patch Init] Loaded TodoDeleteConfirmPatch: {todoDeleteConfirmType.FullName}");
+
+        var noteDeleteConfirmType = typeof(NoteDeleteConfirmPatch);
+        Log.LogWarning($"[Patch Init] Loaded NoteDeleteConfirmPatch: {noteDeleteConfirmType.FullName}");
         
         var harmony = new Harmony(Constants.PluginGUID);
         harmony.PatchAll();

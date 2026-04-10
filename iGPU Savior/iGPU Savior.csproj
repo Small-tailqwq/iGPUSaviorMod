@@ -113,7 +113,9 @@
     <Compile Include="Utilities\TypeHelper.cs" />
     
     <!-- Patches -->
+    <Compile Include="Patches\ExitConfirmationDialogHelper.cs" />
     <Compile Include="Patches\InputPatches.cs" />
+    <Compile Include="Patches\NoteDeleteConfirmPatch.cs" />
     <Compile Include="Patches\TodoDeleteConfirmPatch.cs" />
     
     <!-- UI -->

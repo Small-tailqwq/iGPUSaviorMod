@@ -151,6 +151,13 @@ namespace PotatoOptimization.Patches
       
       try
       {
+        if (PotatoPlugin.Config != null &&
+            PotatoPlugin.Config.CfgEnableDeleteConfirm != null &&
+            !PotatoPlugin.Config.CfgEnableDeleteConfirm.Value)
+        {
+          return true;
+        }
+
         if (!_typesLoaded || TodoUIType == null || ExitConfirmUIType == null || __instance == null)
         {
           PotatoPlugin.Log.LogWarning($"[TodoConfirm] ⚠️ Types not loaded (_typesLoaded={_typesLoaded}), falling back to original delete.");

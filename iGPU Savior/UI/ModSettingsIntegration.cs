@@ -292,6 +292,12 @@ namespace PotatoOptimization.UI
           PotatoPlugin.Config.CfgEnablePortraitMode.Value = val;
           PotatoPlugin.Log.LogInfo($"竖屏优化自启动已设置为: {val}");
         });
+        
+        manager.AddToggle("SETTING_DELETE_CONFIRM", PotatoPlugin.Config.CfgEnableDeleteConfirm.Value, val =>
+        {
+          PotatoPlugin.Config.CfgEnableDeleteConfirm.Value = val;
+          PotatoPlugin.Log.LogInfo($"删除二次确认已设置为: {val}");
+        });
 
         manager.AddDropdown("SETTING_MINI_SCALE", new List<string> { "1/3", "1/4", "1/5" },
                   (int)PotatoPlugin.Config.CfgWindowScale.Value - 3,

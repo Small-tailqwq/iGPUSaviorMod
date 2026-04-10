@@ -20,6 +20,9 @@ namespace PotatoOptimization.Configuration
         // ==================== 相机配置 ====================
         public ConfigEntry<bool> CfgEnableMirror { get; private set; }
         public ConfigEntry<bool> CfgEnablePortraitMode { get; private set; }
+        
+        // ==================== 交互配置 ====================
+        public ConfigEntry<bool> CfgEnableDeleteConfirm { get; private set; }
 
         // ==================== 窗口配置 ====================
         public ConfigEntry<WindowScaleRatio> CfgWindowScale { get; private set; }
@@ -52,6 +55,9 @@ namespace PotatoOptimization.Configuration
             
             CfgEnablePortraitMode = _config.Bind("Camera", "EnablePortraitMode", false, 
                 "启动时是否自动启用竖屏优化(默认关闭,如启用会在游戏初始化后自动激活)");
+            
+            CfgEnableDeleteConfirm = _config.Bind("General", "EnableDeleteConfirm", true,
+                "是否启用笔记/待办删除二次确认(默认开启)");
 
             // 窗口配置
             CfgWindowScale = _config.Bind("Window", "ScaleRatio", WindowScaleRatio.OneThird, 
