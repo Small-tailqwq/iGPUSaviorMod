@@ -56,7 +56,7 @@ namespace PotatoOptimization.UI
         toggleRow.SetActive(true);
 
         // 🔥🔥🔥 关键修复：移除本地化组件，防止翻译被覆盖 🔥🔥🔥
-        RemoveLocalizers(toggleRow);
+        ModUIHelper.RemoveLocalizers(toggleRow);
 
         // ✅ 挂载自定义本地化组件
         var localizer = toggleRow.AddComponent<ModLocalizer>();
@@ -222,30 +222,8 @@ namespace PotatoOptimization.UI
 
     private static void PlayClickSound(Transform root)
     {
-      // 简单的音效播放，找不到也不报错
-      try
-      {
-        // ... 你的音效逻辑 ...
-      }
-      catch { }
-    }
-    private static void RemoveLocalizers(GameObject obj)
-    {
-      // Search on the object itself
-      var localizer = obj.GetComponent<TextLocalizationBehaviour>();
-      if (localizer != null)
-      {
-        UnityEngine.Object.Destroy(localizer);
-        PotatoPlugin.Log.LogInfo($"[UI Fix] Removed localization 'spy' from {obj.name}");
-      }
-
-      // CRITICAL: The Localizer might be on a child object (e.g. the "Label" child of a Button)
-      // So we should check children as well to be safe.
-      var childLocalizers = obj.GetComponentsInChildren<TextLocalizationBehaviour>(true);
-      foreach (var childLoc in childLocalizers)
-      {
-        UnityEngine.Object.Destroy(childLoc);
-      }
+      // Placeholder for sound effect logic
+      // Currently no sound implementation needed
     }
   }
 }

@@ -195,51 +195,17 @@ namespace ModShared
 
       LayoutRebuilder.ForceRebuildLayoutImmediate(_contentParent as RectTransform);
       _isBuildingUI = false;
-
-      LayoutRebuilder.ForceRebuildLayoutImmediate(_contentParent as RectTransform);
-      _isBuildingUI = false;
     }
     // 🆕 === 新增方法：调整 UI 位置 ===
     // 拆分成两个方法
     private void AdjustScrollViewPosition()
     {
-      // Transform scrollView = _contentParent?.parent?.parent;
-      // if (scrollView != null)
-      // {
-      //     RectTransform rect = scrollView.GetComponent<RectTransform>();
-      //     if (rect != null)
-      //     {
-      //         // ❌❌❌ 罪魁祸首在这里！删除下面这一行！ ❌❌❌
-      //         // rect.anchoredPosition = new Vector2(542.89f, -290.8f); 
-
-      //         // ✅ 改为：什么都不做，或者仅仅打印一下当前的日志供我们确认
-      //         PotatoOptimization.Core.PotatoPlugin.Log.LogInfo($"[UI Fix] ScrollView natural position: {rect.anchoredPosition}");
-
-      //         // 既然不移动了，我们只要确保它的 Anchor 是填充父物体的即可 (防御性代码)
-      //         // 通常 ScrollView 应该填满整个 Setting 页面
-      //         rect.anchorMin = Vector2.zero;
-      //         rect.anchorMax = Vector2.one;
-      //         rect.sizeDelta = Vector2.zero; 
-      //         rect.anchoredPosition = Vector2.zero;
-      //     }
-      // }
-      PotatoOptimization.Core.PotatoPlugin.Log.LogInfo("[UI] AdjustScrollViewPosition called - doing nothing (Legacy code disabled)");
+      // Legacy code disabled - layout is now handled by ConfigureContentLayout in ModSettingsIntegration
     }
 
     private void AdjustHeaderPosition(string modName)
     {
-      // string headerName = $"Header_{modName}";
-      // Transform header = _contentParent?.Find(headerName);
-      // if (header != null)
-      // {
-      //   RectTransform headerRect = header.GetComponent<RectTransform>();
-      //   if (headerRect != null)
-      //   {
-      //     Vector3 pos = headerRect.anchoredPosition;
-      //     headerRect.anchoredPosition = new Vector2(200f, pos.y);
-      //     PotatoOptimization.Core.PotatoPlugin.Log.LogInfo($"[UI] ✅ Header '{headerName}' adjusted to {headerRect.anchoredPosition}");
-      //   }
-      // }
+      // Legacy code disabled
     }
 
     private IEnumerator CreateDropdownSequence(DropdownDef def)

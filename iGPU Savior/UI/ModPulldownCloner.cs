@@ -583,9 +583,9 @@ namespace PotatoOptimization.UI
           lastIsOpen = isOpen;
         }
       }
-      catch
+      catch (System.Exception e)
       {
-        // Ignore errors silently
+        PotatoPlugin.Log.LogWarning($"[PulldownLayer] Update failed: {e.Message}");
       }
     }
 

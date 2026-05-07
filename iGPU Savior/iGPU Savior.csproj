@@ -77,6 +77,9 @@
     <Reference Include="UnityEngine.InputLegacyModule">
       <HintPath>$(GameDir)\Chill With You_Data\Managed\UnityEngine.InputLegacyModule.dll</HintPath>
     </Reference>
+    <Reference Include="UnityEngine.PhysicsModule">
+      <HintPath>$(GameDir)\Chill With You_Data\Managed\UnityEngine.PhysicsModule.dll</HintPath>
+    </Reference>
     <Reference Include="UnityEngine.TextRenderingModule">
       <HintPath>$(GameDir)\Chill With You_Data\Managed\UnityEngine.TextRenderingModule.dll</HintPath>
     </Reference>
@@ -88,6 +91,12 @@
     </Reference>
     <Reference Include="VContainer">
       <HintPath>$(GameDir)\Chill With You_Data\Managed\VContainer.dll</HintPath>
+    </Reference>
+    <Reference Include="Unity.RenderPipelines.Core.Runtime">
+      <HintPath>$(GameDir)\Chill With You_Data\Managed\Unity.RenderPipelines.Core.Runtime.dll</HintPath>
+    </Reference>
+    <Reference Include="Unity.RenderPipelines.Universal.Runtime">
+      <HintPath>$(GameDir)\Chill With You_Data\Managed\Unity.RenderPipelines.Universal.Runtime.dll</HintPath>
     </Reference>
   </ItemGroup>
 

@@ -1,6 +1,6 @@
-using System;
 using UnityEngine;
 using UnityEngine.Rendering;
+using UnityEngine.Rendering.Universal;
 using PotatoOptimization.Core;
 
 namespace PotatoOptimization.Features
@@ -12,7 +12,7 @@ namespace PotatoOptimization.Features
     {
         private bool _isPotatoMode = false;
         private float _lastRunTime = 0f;
-        
+
         public bool IsPotatoMode => _isPotatoMode;
 
         /// <summary>
@@ -59,32 +59,31 @@ namespace PotatoOptimization.Features
                 Application.targetFrameRate = Constants.PotatoModeTargetFPS;
                 QualitySettings.vSyncCount = 0;
 
-                // 获取渲染管线
-                var pipeline = GraphicsSettings.currentRenderPipeline;
-                if (pipeline != null)
+                // 直接强转 URP 管线，无需反射
+                var urp = GraphicsSettings.currentRenderPipeline as UniversalRenderPipelineAsset;
+                if (urp != null)
                 {
-                    Type type = pipeline.GetType();
-                    SetProperty(type, pipeline, "renderScale", Constants.PotatoModeRenderScale);
-                    SetProperty(type, pipeline, "shadowDistance", Constants.PotatoModeShadowDistance);
-                    SetProperty(type, pipeline, "msaaSampleCount", 1);
+                    urp.renderScale = Constants.PotatoModeRenderScale;
+                    urp.shadowDistance = Constants.PotatoModeShadowDistance;
+                    urp.msaaSampleCount = 1;
                 }
 
-                // 禁用所有体积效果
-                var allComponents = UnityEngine.Object.FindObjectsOfType<MonoBehaviour>();
-                if (allComponents != null)
+                // 禁用所有体积效果（直接查找 Volume 组件）
+                var volumes = UnityEngine.Object.FindObjectsOfType<Volume>();
+                if (volumes != null)
                 {
-                    foreach (var comp in allComponents)
+                    foreach (var vol in volumes)
                     {
-                        if (comp != null && comp.enabled && comp.GetType().Name.Contains("Volume"))
+                        if (vol != null && vol.enabled)
                         {
-                            comp.enabled = false;
+                            vol.weight = 0f;
                         }
                     }
                 }
             }
-            catch (Exception e)
+            catch (System.Exception e)
             {
-                if (showLog) 
+                if (showLog)
                     PotatoPlugin.Log.LogError($"应用土豆模式失败: {e.Message}");
             }
         }
@@ -97,36 +96,17 @@ namespace PotatoOptimization.Features
             try
             {
                 Application.targetFrameRate = Constants.NormalModeTargetFPS;
-                
-                var pipeline = GraphicsSettings.currentRenderPipeline;
-                if (pipeline != null)
+
+                var urp = GraphicsSettings.currentRenderPipeline as UniversalRenderPipelineAsset;
+                if (urp != null)
                 {
-                    SetProperty(pipeline.GetType(), pipeline, "renderScale", Constants.NormalRenderScale);
-                    SetProperty(pipeline.GetType(), pipeline, "shadowDistance", Constants.NormalShadowDistance);
+                    urp.renderScale = Constants.NormalRenderScale;
+                    urp.shadowDistance = Constants.NormalShadowDistance;
                 }
             }
-            catch (Exception e)
+            catch (System.Exception e)
             {
                 PotatoPlugin.Log.LogError($"恢复画质失败: {e.Message}");
-            }
-        }
-
-        /// <summary>
-        /// 通过反射设置属性
-        /// </summary>
-        private void SetProperty(Type type, object obj, string propName, object value)
-        {
-            try
-            {
-                var prop = type.GetProperty(propName);
-                if (prop != null && prop.CanWrite)
-                {
-                    prop.SetValue(obj, value, null);
-                }
-            }
-            catch (Exception e)
-            {
-                PotatoPlugin.Log.LogWarning($"设置属性失败 [{propName}]: {e.Message}");
             }
         }
     }

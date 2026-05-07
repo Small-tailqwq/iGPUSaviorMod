@@ -212,67 +212,6 @@ namespace PotatoOptimization.UI
       }
     }
 
-    // === 新增的强力修复方法 (请添加到类中) ===
-    static void FixScrollViewLayout(ScrollRect scrollRect)
-    {
-      try
-      {
-        if (scrollRect == null) return;
-        GameObject scrollViewObj = scrollRect.gameObject;
-        GameObject rootObj = scrollViewObj.transform.parent.gameObject;
-
-        PotatoPlugin.Log.LogInfo($"[UI Nuclear Fix] Applying fix to {scrollViewObj.name} inside {rootObj.name}");
-
-        // 1. 【关键一步：拆除父级控制】
-        // 如果不删除这个组件，你设置的任何 offset 都会在下一帧被它重置！
-        var rootVLG = rootObj.GetComponent<VerticalLayoutGroup>();
-        if (rootVLG != null)
-        {
-          PotatoPlugin.Log.LogInfo("  - Destroying VerticalLayoutGroup on Root");
-          UnityEngine.Object.DestroyImmediate(rootVLG);
-        }
-        var rootHLG = rootObj.GetComponent<HorizontalLayoutGroup>();
-        if (rootHLG != null) UnityEngine.Object.DestroyImmediate(rootHLG);
-
-        // 2. 【强制设置 ScrollView 坐标】
-        var rt = scrollRect.GetComponent<RectTransform>();
-        rt.anchorMin = Vector2.zero;
-        rt.anchorMax = Vector2.one;
-        rt.pivot = new Vector2(0.5f, 0.5f);
-
-        // 强制边距：上留 130，下留 50，左右留 40
-        rt.offsetMin = new Vector2(40f, 50f);   // Left, Bottom
-        rt.offsetMax = new Vector2(-40f, -130f); // Right, Top (负数)
-
-        PotatoPlugin.Log.LogInfo($"  - ScrollView Margins Applied: Min={rt.offsetMin}, Max={rt.offsetMax}");
-
-        // 3. 【替换遮罩系统】
-        // 移除可能失效的旧 Mask，换上 RectMask2D
-        if (scrollRect.viewport != null)
-        {
-          var oldMask = scrollRect.viewport.GetComponent<Mask>();
-          var oldImage = scrollRect.viewport.GetComponent<Image>();
-
-          if (oldMask != null) UnityEngine.Object.DestroyImmediate(oldMask);
-          if (oldImage != null) UnityEngine.Object.DestroyImmediate(oldImage);
-
-          var rectMask = scrollRect.viewport.GetComponent<RectMask2D>();
-          if (rectMask == null) rectMask = scrollRect.viewport.gameObject.AddComponent<RectMask2D>();
-
-          // 确保 Viewport 填满 ScrollView
-          var vpRect = scrollRect.viewport.GetComponent<RectTransform>();
-          vpRect.anchorMin = Vector2.zero;
-          vpRect.anchorMax = Vector2.one;
-          vpRect.sizeDelta = Vector2.zero;
-          vpRect.anchoredPosition = Vector2.zero;
-        }
-      }
-      catch (System.Exception e)
-      {
-        PotatoPlugin.Log.LogError($"[UI Nuclear Fix] Failed: {e.Message}");
-      }
-    }
-
     static void RegisterCurrentMod(ModSettingsManager manager)
     {
       ModUICoroutineRunner.Instance.RunDelayed(0.5f, () =>
@@ -340,24 +279,6 @@ namespace PotatoOptimization.UI
     }
     private static void InspectRecursive(Transform t, int depth)
     {
-      // 性能优化：禁用所有 GetComponent 查询和字符串拼接
-      // string indent = new string('-', depth * 2);
-      // var rect = t.GetComponent<RectTransform>();
-
-      // 检查是否有遮罩组件
-      // string maskInfo = "";
-      // if (t.GetComponent<UnityEngine.UI.Mask>() != null) maskInfo += " [Mask]";
-      // if (t.GetComponent<UnityEngine.UI.RectMask2D>() != null) maskInfo += " [RectMask2D]";
-      // if (t.GetComponent<UnityEngine.UI.ScrollRect>() != null) maskInfo += " [ScrollRect]";
-      // if (t.GetComponent<UnityEngine.UI.Image>() != null) maskInfo += " [Image]";
-
-      // 打印关键布局信息
-      // string layoutInfo = rect != null
-      //     ? $"Pos={rect.anchoredPosition}, Size={rect.sizeDelta}, AnchorMin={rect.anchorMin}, AnchorMax={rect.anchorMax}, Pivot={rect.pivot}"
-      //     : "Not RectTransform";
-
-      // PotatoPlugin.Log.LogInfo($"{indent}{t.name} {maskInfo} | {layoutInfo}");
-
       foreach (Transform child in t)
       {
         InspectRecursive(child, depth + 1);
@@ -593,7 +514,10 @@ namespace PotatoOptimization.UI
             if (fBtn.Name != "_generalInteractableUI") b?.DeactivateUseUI(false);
         }
       }
-      catch { }
+      catch (System.Exception e)
+      {
+        PotatoPlugin.Log.LogWarning($"[ModSettingsActivate] Postfix failed: {e.Message}");
+      }
     }
   }
 }
