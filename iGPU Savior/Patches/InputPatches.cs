@@ -33,10 +33,20 @@ namespace PotatoOptimization.Patches
     [HarmonyPatch]
     public class FacilityClickHeroineMirrorPatch
     {
+        private static FieldInfo FI_heroineLayerMask;
+        private static PropertyInfo PI_IsClickedHeroineCurrentFrame;
+
         static MethodBase TargetMethod()
         {
             return typeof(Bulbul.FacilityClickHeroine).GetMethod("UpdateHeroineClickFlag",
                 BindingFlags.Instance | BindingFlags.NonPublic);
+        }
+
+        static void Prepare()
+        {
+            var t = typeof(Bulbul.FacilityClickHeroine);
+            FI_heroineLayerMask = t.GetField("_heroineLayerMask", BindingFlags.Instance | BindingFlags.NonPublic);
+            PI_IsClickedHeroineCurrentFrame = t.GetProperty("IsClickedHeroineCurrentFrame", BindingFlags.Instance | BindingFlags.Public);
         }
 
         static bool Prefix(object __instance)
@@ -44,24 +54,18 @@ namespace PotatoOptimization.Patches
             if (!InputMousePositionPatch.IsInputMirrored)
                 return true;
 
-            var type = __instance.GetType();
-            var heroineLayerMaskField = type.GetField("_heroineLayerMask",
-                BindingFlags.Instance | BindingFlags.NonPublic);
-            var isClickedProp = type.GetProperty("IsClickedHeroineCurrentFrame",
-                BindingFlags.Instance | BindingFlags.Public);
-
-            if (heroineLayerMaskField == null || isClickedProp == null)
+            if (FI_heroineLayerMask == null || PI_IsClickedHeroineCurrentFrame == null)
                 return true;
 
-            int heroineLayerMask = (int)heroineLayerMaskField.GetValue(__instance);
-            isClickedProp.SetValue(__instance, false);
+            int heroineLayerMask = (int)FI_heroineLayerMask.GetValue(__instance);
+            PI_IsClickedHeroineCurrentFrame.SetValue(__instance, false);
 
             if (Input.GetMouseButtonDown(0))
             {
                 Vector3 mirroredPos = InputMousePositionPatch.GetMirroredMousePosition();
                 Ray ray = Camera.main.ScreenPointToRay(mirroredPos);
                 bool hit = Physics.Raycast(ray, out _, float.PositiveInfinity, heroineLayerMask);
-                isClickedProp.SetValue(__instance, hit);
+                PI_IsClickedHeroineCurrentFrame.SetValue(__instance, hit);
             }
 
             return false;
@@ -71,10 +75,15 @@ namespace PotatoOptimization.Patches
     /// <summary>
     /// 补丁 CursorService.UpdateCursor
     /// 在镜像模式下使用镜像坐标做光标样式射线检测
+    /// 状态机分支复制自 Assembly-CSharp 反编译结果（v1.7.4）
     /// </summary>
     [HarmonyPatch]
     public class CursorServiceMirrorPatch
     {
+        private static FieldInfo FI_heroineService;
+        private static FieldInfo FI_scenarioReader;
+        private static FieldInfo FI_roomGameManager;
+        private static FieldInfo FI_heroineLayerMask;
         private static MethodInfo MI_ChangeCursorDefault;
         private static MethodInfo MI_ChangeCursorTalk;
         private static MethodInfo MI_ChangeCursorTalkBlock;
@@ -88,6 +97,10 @@ namespace PotatoOptimization.Patches
         static void Prepare()
         {
             var t = typeof(CursorService);
+            FI_heroineService = t.GetField("_heroineService", BindingFlags.Instance | BindingFlags.NonPublic);
+            FI_scenarioReader = t.GetField("_scenarioReader", BindingFlags.Instance | BindingFlags.NonPublic);
+            FI_roomGameManager = t.GetField("_roomGameManager", BindingFlags.Instance | BindingFlags.NonPublic);
+            FI_heroineLayerMask = t.GetField("_heroineLayerMask", BindingFlags.Instance | BindingFlags.NonPublic);
             MI_ChangeCursorDefault = t.GetMethod("ChangeCursorDefault", BindingFlags.Instance | BindingFlags.NonPublic);
             MI_ChangeCursorTalk = t.GetMethod("ChangeCursorTalk", BindingFlags.Instance | BindingFlags.NonPublic);
             MI_ChangeCursorTalkBlock = t.GetMethod("ChangeCursorTalkBlock", BindingFlags.Instance | BindingFlags.NonPublic);
@@ -98,21 +111,27 @@ namespace PotatoOptimization.Patches
             if (!InputMousePositionPatch.IsInputMirrored)
                 return true;
 
+            if (FI_heroineService == null || FI_scenarioReader == null ||
+                FI_roomGameManager == null || FI_heroineLayerMask == null)
+                return true;
+
             if (Bulbul.DevicePlatformExtension.IsMobile(Bulbul.DevicePlatform.Steam))
                 return false;
 
-            var heroineService = GetField<Bulbul.HeroineService>(__instance, "_heroineService");
-            var scenarioReader = GetField<Bulbul.ScenarioReader>(__instance, "_scenarioReader");
-            var roomGameManager = GetField<Bulbul.RoomGameManager>(__instance, "_roomGameManager");
-            int heroineLayerMask = GetFieldValue<int>(__instance, "_heroineLayerMask");
+            var heroineService = FI_heroineService.GetValue(__instance) as Bulbul.HeroineService;
+            var scenarioReader = FI_scenarioReader.GetValue(__instance) as Bulbul.ScenarioReader;
+            var roomGameManager = FI_roomGameManager.GetValue(__instance) as Bulbul.RoomGameManager;
+            int heroineLayerMask = (int)FI_heroineLayerMask.GetValue(__instance);
 
-            // 光标样式：用镜像坐标做 3D 射线
+            if (heroineService == null || scenarioReader == null || roomGameManager == null)
+                return true;
+
             if (Bulbul.InputController.Instance.CurrentFrameEventSystemRaycastResult.Count > 0 || Camera.main == null)
             {
                 Invoke(MI_ChangeCursorDefault, __instance);
             }
             else if (Physics.Raycast(Camera.main.ScreenPointToRay(InputMousePositionPatch.GetMirroredMousePosition()),
-                out RaycastHit hitInfo, float.PositiveInfinity, heroineLayerMask))
+                out _, float.PositiveInfinity, heroineLayerMask))
             {
                 if (heroineService.IsPossibleClickHeroineReaction())
                 {
@@ -143,18 +162,6 @@ namespace PotatoOptimization.Patches
             }
 
             return false;
-        }
-
-        private static T GetField<T>(object obj, string name)
-        {
-            var fi = obj.GetType().GetField(name, BindingFlags.Instance | BindingFlags.NonPublic);
-            return fi != null ? (T)fi.GetValue(obj) : default;
-        }
-
-        private static T GetFieldValue<T>(object obj, string name)
-        {
-            var fi = obj.GetType().GetField(name, BindingFlags.Instance | BindingFlags.NonPublic);
-            return fi != null ? (T)fi.GetValue(obj) : default;
         }
 
         private static void Invoke(MethodInfo mi, object instance)

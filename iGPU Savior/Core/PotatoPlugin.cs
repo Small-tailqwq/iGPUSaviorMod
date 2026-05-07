@@ -51,6 +51,12 @@ namespace PotatoOptimization.Core
 
         var noteDeleteConfirmType = typeof(NoteDeleteConfirmPatch);
         Log.LogWarning($"[Patch Init] Loaded NoteDeleteConfirmPatch: {noteDeleteConfirmType.FullName}");
+
+        var facilityClickMirrorType = typeof(FacilityClickHeroineMirrorPatch);
+        Log.LogWarning($"[Patch Init] Loaded FacilityClickHeroineMirrorPatch: {facilityClickMirrorType.FullName}");
+
+        var cursorServiceMirrorType = typeof(CursorServiceMirrorPatch);
+        Log.LogWarning($"[Patch Init] Loaded CursorServiceMirrorPatch: {cursorServiceMirrorType.FullName}");
         
         var harmony = new Harmony(Constants.PluginGUID);
         harmony.PatchAll();

@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Rendering;
 using UnityEngine.Rendering.Universal;
@@ -12,6 +13,7 @@ namespace PotatoOptimization.Features
     {
         private bool _isPotatoMode = false;
         private float _lastRunTime = 0f;
+        private readonly Dictionary<Volume, float> _originalVolumeWeights = new Dictionary<Volume, float>();
 
         public bool IsPotatoMode => _isPotatoMode;
 
@@ -76,6 +78,8 @@ namespace PotatoOptimization.Features
                     {
                         if (vol != null && vol.enabled)
                         {
+                            if (!_originalVolumeWeights.ContainsKey(vol))
+                                _originalVolumeWeights[vol] = vol.weight;
                             vol.weight = 0f;
                         }
                     }
@@ -103,6 +107,14 @@ namespace PotatoOptimization.Features
                     urp.renderScale = Constants.NormalRenderScale;
                     urp.shadowDistance = Constants.NormalShadowDistance;
                 }
+
+                // 恢复 Volume 权重
+                foreach (var kvp in _originalVolumeWeights)
+                {
+                    if (kvp.Key != null)
+                        kvp.Key.weight = kvp.Value;
+                }
+                _originalVolumeWeights.Clear();
             }
             catch (System.Exception e)
             {
