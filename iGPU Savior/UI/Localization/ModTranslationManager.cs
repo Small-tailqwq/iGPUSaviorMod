@@ -58,6 +58,13 @@ namespace PotatoOptimization.UI
 
       // Note Delete Confirmation
       Add("NOTE_DELETE_CONFIRM_PROMPT", "Are you sure you want to delete this note?", "このノートを削除してもよろしいですか？", "确定要删除这页笔记吗？");
+
+      // Note Export
+      Add("NOTE_EXPORT_BUTTON", "Export", "エクスポート", "导出");
+      Add("NOTE_EXPORT_CANCEL", "Cancel", "キャンセル", "取消");
+      Add("NOTE_EXPORT_CONFIRM", "Confirm Export", "エクスポート確認", "确认导出");
+      Add("NOTE_EXPORT_SUCCESS", "Export complete", "エクスポート完了", "导出完成");
+      Add("NOTE_EXPORT_FAIL", "Export failed", "エクスポート失敗", "导出失败");
     }
 
     public static string Get(string key, GameLanguageType lang)

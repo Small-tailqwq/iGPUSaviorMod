@@ -1,0 +1,32 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <IsPackable>false</IsPackable>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.10.0" />
+    <PackageReference Include="xunit" Version="2.9.0" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="2.8.2">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Include="NoteExportFolderPickerTests.cs" />
+    <Compile Include="TestStubs\FolderPickerTestStubs.cs" />
+    <Compile Include="NoteExportNamingTests.cs" />
+    <Compile Include="NoteExportManagerStateTests.cs" />
+    <Compile Include="NoteExportStateCapturePolicyTests.cs" />
+    <Compile Include="NoteExportHeaderLayoutTests.cs" />
+    <Compile Include="..\iGPU Savior\Features\NoteExportFolderPicker.cs" Link="NoteExportFolderPicker.cs" />
+    <Compile Include="..\iGPU Savior\Utilities\NoteExportNaming.cs" Link="NoteExportNaming.cs" />
+    <Compile Include="..\iGPU Savior\Features\NoteExportManager.cs" Link="NoteExportManager.cs" />
+    <Compile Include="..\iGPU Savior\Features\NoteExportSelectionState.cs" Link="NoteExportSelectionState.cs" />
+    <Compile Include="..\iGPU Savior\Patches\NoteExportStateCapturePolicy.cs" Link="NoteExportStateCapturePolicy.cs" />
+    <Compile Include="..\iGPU Savior\Patches\NoteExportHeaderLayout.cs" Link="NoteExportHeaderLayout.cs" />
+  </ItemGroup>
+</Project>

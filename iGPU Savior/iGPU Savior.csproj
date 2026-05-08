@@ -114,16 +114,23 @@
     <Compile Include="Features\RenderQualityManager.cs" />
     <Compile Include="Features\AudioManager.cs" />
     <Compile Include="Features\CameraMirrorManager.cs" />
+    <Compile Include="Features\NoteExportFolderPicker.cs" />
+    <Compile Include="Features\NoteExportManager.cs" />
+    <Compile Include="Features\NoteExportSelectionState.cs" />
     <Compile Include="Features\PortraitModeManager.cs" />
     <Compile Include="Features\WindowStateManager.cs" />
     
     <!-- Utilities -->
     <Compile Include="Utilities\WindowManager.cs" />
     <Compile Include="Utilities\TypeHelper.cs" />
+    <Compile Include="Utilities\NoteExportNaming.cs" />
     
     <!-- Patches -->
     <Compile Include="Patches\ExitConfirmationDialogHelper.cs" />
     <Compile Include="Patches\InputPatches.cs" />
+    <Compile Include="Patches\NoteExportPatch.cs" />
+    <Compile Include="Patches\NoteExportStateCapturePolicy.cs" />
+    <Compile Include="Patches\NoteExportHeaderLayout.cs" />
     <Compile Include="Patches\NoteDeleteConfirmPatch.cs" />
     <Compile Include="Patches\TodoDeleteConfirmPatch.cs" />
     

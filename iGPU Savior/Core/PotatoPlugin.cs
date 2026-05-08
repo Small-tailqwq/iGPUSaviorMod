@@ -52,6 +52,27 @@ namespace PotatoOptimization.Core
         var noteDeleteConfirmType = typeof(NoteDeleteConfirmPatch);
         Log.LogWarning($"[Patch Init] Loaded NoteDeleteConfirmPatch: {noteDeleteConfirmType.FullName}");
 
+        var noteExportPatchType = typeof(NoteExportPatch);
+        Log.LogWarning($"[Patch Init] Loaded NoteExportPatch: {noteExportPatchType.FullName}");
+
+        var noteExportSelectPagePatchType = typeof(NoteExportSelectPagePatch);
+        Log.LogWarning($"[Patch Init] Loaded NoteExportSelectPagePatch: {noteExportSelectPagePatchType.FullName}");
+
+        var noteExportSelectPageGuardPatchType = typeof(NoteExportSelectPageGuardPatch);
+        Log.LogWarning($"[Patch Init] Loaded NoteExportSelectPageGuardPatch: {noteExportSelectPageGuardPatchType.FullName}");
+
+        var noteExportEditTitleGuardPatchType = typeof(NoteExportEditTitleGuardPatch);
+        Log.LogWarning($"[Patch Init] Loaded NoteExportEditTitleGuardPatch: {noteExportEditTitleGuardPatchType.FullName}");
+
+        var noteExportStartReorderGuardPatchType = typeof(NoteExportStartReorderGuardPatch);
+        Log.LogWarning($"[Patch Init] Loaded NoteExportStartReorderGuardPatch: {noteExportStartReorderGuardPatchType.FullName}");
+
+        var noteExportDragReorderGuardPatchType = typeof(NoteExportDragReorderGuardPatch);
+        Log.LogWarning($"[Patch Init] Loaded NoteExportDragReorderGuardPatch: {noteExportDragReorderGuardPatchType.FullName}");
+
+        var noteExportEndReorderGuardPatchType = typeof(NoteExportEndReorderGuardPatch);
+        Log.LogWarning($"[Patch Init] Loaded NoteExportEndReorderGuardPatch: {noteExportEndReorderGuardPatchType.FullName}");
+
         var facilityClickMirrorType = typeof(FacilityClickHeroineMirrorPatch);
         Log.LogWarning($"[Patch Init] Loaded FacilityClickHeroineMirrorPatch: {facilityClickMirrorType.FullName}");
 
