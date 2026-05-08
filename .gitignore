@@ -3,7 +3,7 @@
 ##
 ## Get latest from https://github.com/github/gitignore/blob/master/VisualStudio.gitignore
 
-docs
+docs/_internal/
 .claude/
 .vscode/
 .github/
@@ -365,3 +365,7 @@ MigrationBackup/
 
 # Fody - auto-generated XML schema
 FodyWeavers.xsd
+
+# 导出文件测试
+output_test
+output_test/*
