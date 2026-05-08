@@ -37,7 +37,6 @@ namespace PotatoOptimization.Core
       CreateController();
 
       Log.LogWarning($">>> {Constants.PluginName} v{Constants.PluginVersion} 启动成功 <<<");
-      Log.LogWarning(">>> [V1.7.4] 插件启动：UI自适应修复版<<<");
     }
 
     private void ApplyHarmonyPatches()

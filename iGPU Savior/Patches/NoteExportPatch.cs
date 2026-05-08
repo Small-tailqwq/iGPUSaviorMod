@@ -1,6 +1,7 @@
 using System;
 using System.Reflection;
 using HarmonyLib;
+using R3;
 using TMPro;
 using UnityEngine;
 using UnityEngine.Events;
@@ -417,6 +418,8 @@ namespace PotatoOptimization.Patches
     public Button ConfirmButton { get; set; }
     public Button AddButton { get; private set; }
 
+    private IDisposable _languageSubscription;
+
     public void Bind(NoteExportManager manager, Button addButton, TMP_InputField titleInputField, TMP_InputField mainInputField)
     {
       var captureAddButtonState = NoteExportStateCapturePolicy.ShouldCaptureOriginalState(
@@ -443,6 +446,7 @@ namespace PotatoOptimization.Patches
       _titleInputField = titleInputField;
       _mainInputField = mainInputField;
       CaptureOriginalStates(captureAddButtonState, captureTitleInputState, captureMainInputState);
+      TrySubscribeLanguage();
     }
 
     public void Refresh()
@@ -511,6 +515,25 @@ namespace PotatoOptimization.Patches
         HandleSelectionModeChanged,
         HandleSelectionChanged);
       _isBound = false;
+
+      _languageSubscription?.Dispose();
+    }
+
+    private void TrySubscribeLanguage()
+    {
+      if (_languageSubscription != null) return;
+      try
+      {
+        var languageSupplier = ProjectLifetimeScope.Resolve<LanguageSupplier>();
+        if (languageSupplier?.Language != null)
+        {
+          _languageSubscription = languageSupplier.Language.Subscribe(_ => UpdateButtons());
+        }
+      }
+      catch (Exception e)
+      {
+        PotatoPlugin.Log?.LogWarning("[NoteExport] Language subscription failed: " + e.Message);
+      }
     }
 
     private void CaptureOriginalStates(bool captureAddButtonState, bool captureTitleInputState, bool captureMainInputState)
