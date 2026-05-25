@@ -116,7 +116,12 @@ DragMethod = RightClick_Hold
 
 详细更新日志请查看 [GitHub 版本历史](https://github.com/Small-tailqwq/iGPUSaviorMod/releases)
 
-### v1.8.0（最新版本）- 笔记导出与缺陷修复版
+### v1.8.1（最新版本）- 原版设置激活态修复与发版流程改进
+- 🐛 **设置界面修复**：修复安装 mod 后原版设置 ON/OFF 激活高亮丢失的问题。
+- ✅ **回归测试**：新增字段筛选回归测试，防止 `InteractableUI` 误匹配再次造成 UI 状态错乱。
+- 🧩 **版本管理统一**：新增 `version.json` + `scripts/sync-version.ps1`，后续发版只改一处版本号再同步。
+
+### v1.8.0 - 笔记导出与缺陷修复版
 - 📝 **笔记多选导出**：支持多选笔记导出为 UTF-8 with BOM 的 `.txt` 文件。
 - 🗑️ **删除确认**：笔记删除增加确认弹窗。
 - 🐛 **缺陷修复**：修复镜像模式 UI 按钮错误激活。
@@ -161,3 +166,4 @@ DragMethod = RightClick_Hold
 ---
 
 **免责声明**：本插件仅供学习交流使用，请勿用于商业用途。使用本插件产生的任何问题与作者无关。
+

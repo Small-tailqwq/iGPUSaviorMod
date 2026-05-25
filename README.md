@@ -218,7 +218,17 @@ DragMethod = RightClick_Hold
 ## 📝 版本历史
 > 注：版本号为 AI 自己写的，不关我的事
 
-### v1.8.0（最新版本）- 笔记导出与缺陷修复版
+### 发版版本号同步
+- 编辑仓库根目录 `version.json`。
+- 运行 `scripts/sync-version.ps1` 同步 `Constants.cs`、`thunderstore/manifest.json` 与文档版本标题。
+- 发版前可执行 `scripts/sync-version.ps1 -CheckOnly` 做一致性检查。
+
+### v1.8.1（最新版本）- 原版设置激活态修复与发版流程改进
+- 🐛 **设置界面修复**：修复安装 mod 后原版设置 ON/OFF 激活高亮丢失的问题。
+- ✅ **回归测试**：新增字段筛选回归测试，防止 `InteractableUI` 误匹配再次造成 UI 状态错乱。
+- 🧩 **版本管理统一**：新增 `version.json` + `scripts/sync-version.ps1`，后续发版只改一处版本号再同步。
+
+### v1.8.0 - 笔记导出与缺陷修复版
 - 📝 [noteworthy] **笔记多选导出**：支持多选笔记导出为 UTF-8 with BOM 的 `.txt` 文件。
 - 🗑️ **删除确认**：笔记删除操作增加确认弹窗，可在 MOD 设置中开关。
 - 🐛 **缺陷修复**：修复镜像模式 UI 按钮错误激活等问题。

@@ -8,8 +8,8 @@ namespace PotatoOptimization.Core
     // ==================== 插件信息 ====================
     public const string PluginGUID = "chillwithyou.potatomode";
     public const string PluginName = "Potato Mode Optimization";
-    // 发布前修改此处的版本号：搜索 "#RELEASE_VERSION" 可定位所有需同步的位置
-    public const string PluginVersion = "1.8.0";
+    // 版本号由仓库根目录 version.json 管理，发版前运行 scripts/sync-version.ps1 同步。
+    public const string PluginVersion = "1.8.1";
 
     // ==================== Win32 API 常量 ====================
     public const int GWL_STYLE = -16;
@@ -57,3 +57,4 @@ namespace PotatoOptimization.Core
     public const string AudioTabContentPath = "MusicAudio/ScrollView/Viewport/Content";
   }
 }
+

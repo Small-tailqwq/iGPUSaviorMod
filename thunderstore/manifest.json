@@ -1,6 +1,6 @@
 {
     "name": "iGPU_Savior",
-    "version_number": "1.8.0",
+    "version_number": "1.8.1",
     "website_url": "https://github.com/Small-tailqwq/iGPUSaviorMod",
     "description": "性能和体验优化插件，降低资源占用，提供镜像、小窗、竖屏等增强体验模式。",
     "dependencies": [
