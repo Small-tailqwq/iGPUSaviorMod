@@ -382,7 +382,10 @@ namespace PotatoOptimization.UI
     private static void HookIntoTabButtons(SettingUI settingUI)
     {
       var allFields = AccessTools.GetDeclaredFields(typeof(SettingUI));
-      var interactableFields = allFields.Where(f => f.FieldType == typeof(InteractableUI) && f.Name.EndsWith("InteractableUI"));
+      var interactableFields = SettingUITabFieldSelector.GetTabInteractableFields(
+        allFields,
+        typeof(InteractableUI),
+        typeof(GameObject));
 
       foreach (var fBtn in interactableFields)
       {
@@ -411,13 +414,25 @@ namespace PotatoOptimization.UI
     private static void SwitchToModTab(SettingUI settingUI)
     {
       var allFields = AccessTools.GetDeclaredFields(typeof(SettingUI));
+      var tabInteractableFields = SettingUITabFieldSelector.GetTabInteractableFields(
+        allFields,
+        typeof(InteractableUI),
+        typeof(GameObject));
+      var tabParentFields = tabInteractableFields
+        .Select(tabField =>
+        {
+          var prefix = tabField.Name.Replace("InteractableUI", "");
+          return allFields.FirstOrDefault(f => f.Name == prefix + "Parent" && f.FieldType == typeof(GameObject));
+        })
+        .Where(parentField => parentField != null)
+        .Distinct();
 
       // 关闭原版游戏目前存在的所有标签内容页
-      foreach (var fParent in allFields.Where(f => f.FieldType == typeof(GameObject) && f.Name.EndsWith("Parent")))
+      foreach (var fParent in tabParentFields)
         (fParent.GetValue(settingUI) as GameObject)?.SetActive(false);
 
       // 取消原版游戏目前存在的所有标签按钮的激活高亮状态
-      foreach (var fBtn in allFields.Where(f => f.FieldType == typeof(InteractableUI) && f.Name.EndsWith("InteractableUI")))
+      foreach (var fBtn in tabInteractableFields)
         (fBtn.GetValue(settingUI) as InteractableUI)?.DeactivateUseUI(false);
 
       OnOpenModTab();
@@ -500,15 +515,27 @@ namespace PotatoOptimization.UI
         generalParent?.SetActive(true);
 
         var allFields = AccessTools.GetDeclaredFields(typeof(SettingUI));
+        var tabInteractableFields = SettingUITabFieldSelector.GetTabInteractableFields(
+          allFields,
+          typeof(InteractableUI),
+          typeof(GameObject));
+        var tabParentFields = tabInteractableFields
+          .Select(tabField =>
+          {
+            var prefix = tabField.Name.Replace("InteractableUI", "");
+            return allFields.FirstOrDefault(f => f.Name == prefix + "Parent" && f.FieldType == typeof(GameObject));
+          })
+          .Where(parentField => parentField != null)
+          .Distinct();
         
         // 当打开菜单时，动态关闭所有除非 General 以外的其他原版标签页
-        foreach (var fParent in allFields.Where(f => f.FieldType == typeof(GameObject) && f.Name.EndsWith("Parent")))
+        foreach (var fParent in tabParentFields)
         {
             var p = fParent.GetValue(__instance) as GameObject;
             if (fParent.Name != "_generalParent") p?.SetActive(false);
         }
 
-        foreach (var fBtn in allFields.Where(f => f.FieldType == typeof(InteractableUI) && f.Name.EndsWith("InteractableUI")))
+        foreach (var fBtn in tabInteractableFields)
         {
             var b = fBtn.GetValue(__instance) as InteractableUI;
             if (fBtn.Name != "_generalInteractableUI") b?.DeactivateUseUI(false);

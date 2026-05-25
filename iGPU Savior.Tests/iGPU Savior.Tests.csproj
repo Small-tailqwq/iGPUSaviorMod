@@ -16,12 +16,14 @@
   </ItemGroup>
 
   <ItemGroup>
+    <Compile Include="SettingUITabFieldSelectorTests.cs" />
     <Compile Include="NoteExportFolderPickerTests.cs" />
     <Compile Include="TestStubs\FolderPickerTestStubs.cs" />
     <Compile Include="NoteExportNamingTests.cs" />
     <Compile Include="NoteExportManagerStateTests.cs" />
     <Compile Include="NoteExportStateCapturePolicyTests.cs" />
     <Compile Include="NoteExportHeaderLayoutTests.cs" />
+    <Compile Include="..\iGPU Savior\UI\SettingUITabFieldSelector.cs" Link="SettingUITabFieldSelector.cs" />
     <Compile Include="..\iGPU Savior\Features\NoteExportFolderPicker.cs" Link="NoteExportFolderPicker.cs" />
     <Compile Include="..\iGPU Savior\Utilities\NoteExportNaming.cs" Link="NoteExportNaming.cs" />
     <Compile Include="..\iGPU Savior\Features\NoteExportManager.cs" Link="NoteExportManager.cs" />

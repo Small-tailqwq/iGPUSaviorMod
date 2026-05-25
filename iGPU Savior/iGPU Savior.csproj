@@ -138,6 +138,7 @@
     <Compile Include="UI\ModPulldownCloner.cs" />
     <Compile Include="UI\ModSettingsManager.cs" />
     <Compile Include="UI\ModSettingsIntegration.cs" />
+    <Compile Include="UI\SettingUITabFieldSelector.cs" />
     <Compile Include="UI\ModToggleCloner.cs" />
     <Compile Include="UI\ModInputFieldCloner.cs" />
     <Compile Include="UI\Localization\ModLocalizer.cs" />
