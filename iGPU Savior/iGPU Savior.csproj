@@ -119,6 +119,7 @@
     <Compile Include="Features\NoteExportSelectionState.cs" />
     <Compile Include="Features\PortraitModeManager.cs" />
     <Compile Include="Features\WindowStateManager.cs" />
+    <Compile Include="Features\CostumeWhisperHelper.cs" />
     
     <!-- Utilities -->
     <Compile Include="Utilities\WindowManager.cs" />
@@ -133,6 +134,7 @@
     <Compile Include="Patches\NoteExportHeaderLayout.cs" />
     <Compile Include="Patches\NoteDeleteConfirmPatch.cs" />
     <Compile Include="Patches\TodoDeleteConfirmPatch.cs" />
+    <Compile Include="Patches\CostumePatch.cs" />
     
     <!-- UI -->
     <Compile Include="UI\ModPulldownCloner.cs" />

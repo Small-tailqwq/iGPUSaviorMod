@@ -77,6 +77,9 @@ namespace PotatoOptimization.Core
 
         var cursorServiceMirrorType = typeof(CursorServiceMirrorPatch);
         Log.LogWarning($"[Patch Init] Loaded CursorServiceMirrorPatch: {cursorServiceMirrorType.FullName}");
+
+        var costumePatchType = typeof(CostumePatch);
+        Log.LogWarning($"[Patch Init] Loaded CostumePatch: {costumePatchType.FullName}");
         
         var harmony = new Harmony(Constants.PluginGUID);
         harmony.PatchAll();

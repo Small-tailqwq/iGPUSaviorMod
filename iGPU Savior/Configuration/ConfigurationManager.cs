@@ -28,6 +28,10 @@ namespace PotatoOptimization.Configuration
         public ConfigEntry<WindowScaleRatio> CfgWindowScale { get; private set; }
         public ConfigEntry<DragMode> CfgDragMode { get; private set; }
 
+        // ==================== 服装配置 ====================
+        public ConfigEntry<bool> CfgDisableCostumeRotation { get; private set; }
+        public ConfigEntry<string> CfgSuggestedCostumeSkin { get; private set; }
+
         public ConfigurationManager(ConfigFile config)
         {
             _config = config;
@@ -65,6 +69,13 @@ namespace PotatoOptimization.Configuration
             
             CfgDragMode = _config.Bind("Window", "DragMethod", DragMode.Ctrl_LeftClick, 
                 "拖动方式");
+
+            // 服装配置
+            CfgDisableCostumeRotation = _config.Bind("Costume", "DisableRotation", false,
+                "屏蔽服装轮换(开启后始终使用默认服装,需重启游戏生效)");
+            
+            CfgSuggestedCostumeSkin = _config.Bind("Costume", "SuggestedCostumeSkin", "",
+                "悄悄话-建议明日服装(填入服装名称如 Polo_1,使用一次后自动清空,需重启游戏生效)");
 
         }
 

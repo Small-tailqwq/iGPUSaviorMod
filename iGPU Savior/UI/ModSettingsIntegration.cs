@@ -9,6 +9,7 @@ using System.Linq;
 using ModShared;
 using BepInEx.Configuration;
 using PotatoOptimization.Core;
+using PotatoOptimization.Features;
 
 namespace PotatoOptimization.UI
 {
@@ -20,6 +21,7 @@ namespace PotatoOptimization.UI
     private static SettingUI cachedSettingUI;
     private static Canvas _rootCanvas;
     private static List<GameObject> modDropdowns = new List<GameObject>();
+    private static GameObject _whisperDropdown;
 
     static void Postfix(SettingUI __instance)
     {
@@ -260,18 +262,118 @@ namespace PotatoOptimization.UI
         manager.AddDropdown("SETTING_KEY_PORTRAIT", keyOptions, GetKeyIndex(PotatoPlugin.Config.KeyPortraitMode.Value),
                   i => PotatoPlugin.Config.KeyPortraitMode.Value = GetKey(i));
 
+        // 悄悄话-服装建议下拉框
+        var whisperSkinKeys = new List<string> { "WHISPER_NONE" };
+        var whisperSkinMap = new Dictionary<string, string> { { "WHISPER_NONE", "" } };
+        foreach (var skinName in CostumeWhisperHelper.GetCostumeSkinNames())
+        {
+            var key = "SKIN_" + skinName;
+            whisperSkinKeys.Add(key);
+            whisperSkinMap[key] = skinName;
+        }
+        string currentWhisperValue = PotatoPlugin.Config.CfgSuggestedCostumeSkin.Value;
+        string currentWhisperKey = string.IsNullOrEmpty(currentWhisperValue) ? "WHISPER_NONE"
+            : "SKIN_" + currentWhisperValue;
+        int whisperDefaultIdx = whisperSkinKeys.IndexOf(currentWhisperKey);
+        if (whisperDefaultIdx < 0) whisperDefaultIdx = 0;
+
+        manager.AddDropdown("SETTING_WHISPER", whisperSkinKeys, whisperDefaultIdx, index =>
+        {
+            string selectedKey = whisperSkinKeys[index];
+            string skinValue = whisperSkinMap[selectedKey];
+            PotatoPlugin.Config.CfgSuggestedCostumeSkin.Value = skinValue;
+            PotatoPlugin.Config.Save();
+
+            if (index == 0)
+            {
+                PotatoPlugin.Log.LogInfo("[Whisper] Cleared suggestion");
+            }
+            else
+            {
+                var langSupplier = NestopiSystem.DIContainers.ProjectLifetimeScope
+                    .Resolve<LanguageSupplier>();
+                var currentLang = langSupplier?.Get() ?? GameLanguageType.English;
+                string translatedName = ModTranslationManager.Get(selectedKey, currentLang);
+                string msg = ModTranslationManager.Get("WHISPER_SET_SUCCESS", currentLang);
+                CostumeWhisperHelper.ShowToast($"{msg} [{translatedName}]");
+                PotatoPlugin.Log.LogInfo($"[Whisper] Set suggestion: {skinValue}");
+
+                ModUICoroutineRunner.Instance.RunDelayed(0.2f, () =>
+                {
+                    SetWhisperDropdownPending();
+                });
+            }
+        });
+
         var scrollRect = modContentParent.GetComponentInChildren<ScrollRect>();
         if (scrollRect != null)
         {
           manager.RebuildUI(scrollRect.content, cachedSettingUI.transform);
           ModUICoroutineRunner.Instance.RunDelayed(1.0f, () =>
           {
-            if (modContentParent != null) DebugUIHierarchy(modContentParent.transform);
+            if (modContentParent != null)
+            {
+              FindWhisperDropdown();
+              if (CostumeWhisperHelper.IsWhisperPending())
+              {
+                SetWhisperDropdownPending();
+              }
+            }
           });
         }
       });
     }
     // 在 ModSettingsIntegration 类中添加
+    private static void FindWhisperDropdown()
+    {
+      _whisperDropdown = null;
+      if (modContentParent == null) return;
+      var allT = modContentParent.GetComponentsInChildren<Transform>(true);
+      foreach (var child in allT)
+      {
+        if (child.name == "SelectButton_WHISPER_NONE")
+        {
+          var p = child.parent;
+          while (p != null)
+          {
+            if (p.name == "ModPulldownList") { _whisperDropdown = p.gameObject; return; }
+            p = p.parent;
+          }
+          break;
+        }
+      }
+    }
+
+    private static void SetWhisperDropdownPending()
+    {
+      if (_whisperDropdown == null) FindWhisperDropdown();
+      if (_whisperDropdown == null) return;
+
+      var pulldownBtn = _whisperDropdown.transform.Find("PulldownList/PulldownButton");
+      if (pulldownBtn != null)
+      {
+        var btn = pulldownBtn.GetComponent<Button>();
+        if (btn != null) btn.interactable = false;
+        var cg = pulldownBtn.GetComponent<CanvasGroup>() ?? pulldownBtn.gameObject.AddComponent<CanvasGroup>();
+        cg.alpha = 0.4f;
+        cg.interactable = false;
+        cg.blocksRaycasts = false;
+      }
+
+      var curText = _whisperDropdown.transform.Find("PulldownList/Pulldown/CurrentSelectText (TMP)");
+      if (curText != null)
+      {
+        var tmp = curText.GetComponent<TMP_Text>();
+        if (tmp != null)
+        {
+          var langSupplier = NestopiSystem.DIContainers.ProjectLifetimeScope.Resolve<LanguageSupplier>();
+          var lang = langSupplier?.Get() ?? GameLanguageType.English;
+          tmp.text = ModTranslationManager.Get("WHISPER_PENDING", lang);
+          tmp.color = new Color(1f, 1f, 1f, 0.5f);
+        }
+      }
+    }
+
     public static void DebugUIHierarchy(Transform root)
     {
       PotatoPlugin.Log.LogWarning($"[UI DEBUG] Inspecting Hierarchy for: {root.name}");

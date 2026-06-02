@@ -59,6 +59,18 @@ namespace PotatoOptimization.UI
       // Note Delete Confirmation
       Add("NOTE_DELETE_CONFIRM_PROMPT", "Are you sure you want to delete this note?", "このノートを削除してもよろしいですか？", "确定要删除这页笔记吗？");
 
+      // Costume Suggestion
+      Add("SETTING_WHISPER", "Costume Suggestion", "服装提案", "服装建议");
+      Add("WHISPER_NONE", "No Suggestion (Normal Lottery)", "提案なし（通常抽選）", "无建议（使用正常轮换）");
+      Add("WHISPER_SET_SUCCESS", "Set! Restart to apply", "設定完了！再起動後に反映", "设置完成，尽请期待");
+      Add("WHISPER_PENDING", "Pending: restart to apply", "待機中：再起動後に反映", "待生效：重启后应用");
+      // 服装名翻译（供下拉框显示）
+      Add("SKIN_Default_1", "Default Outfit", "デフォルト服", "默认服装");
+      Add("SKIN_Polo_1", "Polo Style 1", "ポロスタイル1", "马球衫款式1");
+      Add("SKIN_Polo_2", "Polo Style 2", "ポロスタイル2", "马球衫款式2");
+      Add("SKIN_Tee_1", "T-Shirt Style 1", "Tシャツスタイル1", "T恤款式1");
+      Add("SKIN_Tee_2", "T-Shirt Style 2", "Tシャツスタイル2", "T恤款式2");
+
       // Note Export
       Add("NOTE_EXPORT_BUTTON", "Export", "エクスポート", "导出");
       Add("NOTE_EXPORT_CANCEL", "Cancel", "キャンセル", "取消");
