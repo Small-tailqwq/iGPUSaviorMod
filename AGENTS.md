@@ -60,6 +60,9 @@ dotnet test "iGPU Savior.Tests\iGPU Savior.Tests.csproj"
 - `F4` — 相机镜像（RenderTexture + UV 翻转）
 - `F5` — 竖屏优化
 
+## 提交规范
+- 提交信息（commit message）必须使用中文
+
 ## MCP 工具
 ### ilspy-mcp（程序集反编译）
 - Gamedir：`D:\SteamLibrary\steamapps\common\Chill with You Lo-Fi Story\Chill With You_Data\Managed\`
