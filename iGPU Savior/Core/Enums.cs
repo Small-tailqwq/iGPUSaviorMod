@@ -15,9 +15,9 @@ namespace PotatoOptimization.Core
     /// </summary>
     public enum DragMode
     {
-        Ctrl_LeftClick,  // Ctrl + 左键 (最推荐，系统级丝滑)
+        Ctrl_LeftClick,  // Ctrl + 左键
         Alt_LeftClick,   // Alt + 左键
-        RightClick_Hold  // 右键按住 (手动计算，已修复抽搐)
+        RightClick_Hold  // 右键按住
     }
 
 }

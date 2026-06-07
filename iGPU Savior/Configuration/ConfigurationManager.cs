@@ -21,12 +21,16 @@ namespace PotatoOptimization.Configuration
         public ConfigEntry<bool> CfgEnableMirror { get; private set; }
         public ConfigEntry<bool> CfgEnablePortraitMode { get; private set; }
         
+        // ==================== 性能配置 ====================
+        public ConfigEntry<bool> CfgEnableBackgroundOptimization { get; private set; }
+
         // ==================== 交互配置 ====================
         public ConfigEntry<bool> CfgEnableDeleteConfirm { get; private set; }
 
         // ==================== 窗口配置 ====================
         public ConfigEntry<WindowScaleRatio> CfgWindowScale { get; private set; }
         public ConfigEntry<DragMode> CfgDragMode { get; private set; }
+        public ConfigEntry<bool> CfgAutoHideGuiInPiP { get; private set; }
 
         // ==================== 服装配置 ====================
         public ConfigEntry<bool> CfgDisableCostumeRotation { get; private set; }
@@ -63,12 +67,19 @@ namespace PotatoOptimization.Configuration
             CfgEnableDeleteConfirm = _config.Bind("General", "EnableDeleteConfirm", true,
                 "是否启用笔记/待办删除二次确认(默认开启)");
 
+            // 性能配置
+            CfgEnableBackgroundOptimization = _config.Bind("Performance", "EnableBackgroundOptimization", true,
+                "窗口失焦时自动温和限帧(不降低画质)");
+
             // 窗口配置
             CfgWindowScale = _config.Bind("Window", "ScaleRatio", WindowScaleRatio.OneThird, 
-                "小窗缩放比例");
+                "首次进入小窗时使用的初始缩放比例，之后优先恢复上次自由尺寸");
             
             CfgDragMode = _config.Bind("Window", "DragMethod", DragMode.Ctrl_LeftClick, 
                 "拖动方式");
+
+            CfgAutoHideGuiInPiP = _config.Bind("Window", "AutoHideGuiInPiP", false,
+                "进入小窗模式时自动隐藏游戏GUI，退出小窗时自动恢复");
 
             // 服装配置
             CfgDisableCostumeRotation = _config.Bind("Costume", "DisableRotation", false,

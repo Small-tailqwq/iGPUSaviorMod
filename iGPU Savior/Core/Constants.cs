@@ -13,6 +13,7 @@ namespace PotatoOptimization.Core
 
     // ==================== Win32 API 常量 ====================
     public const int GWL_STYLE = -16;
+    public const int GWL_EXSTYLE = -20;
     public const uint WS_CAPTION = 0x00C00000;
     public const uint WS_THICKFRAME = 0x00040000;
     public const uint WS_SYSMENU = 0x00080000;
@@ -27,12 +28,24 @@ namespace PotatoOptimization.Core
     public const int HT_CAPTION = 0x2;
 
     // ==================== 性能设置 ====================
-    public const int PotatoModeTargetFPS = 15;
+    // 正常模式（恢复默认）
     public const int NormalModeTargetFPS = 60;
-    public const float PotatoModeRenderScale = 0.4f;
     public const float NormalRenderScale = 1.0f;
-    public const float PotatoModeShadowDistance = 0f;
     public const float NormalShadowDistance = 50f;
+    public const int NormalMSAASampleCount = 1;
+    public const int NormalMaxAdditionalLights = 4;
+
+    // 土豆模式（用户手动 F2 切换）
+    public const int PotatoModeTargetFPS = 15;
+    public const float PotatoModeRenderScale = 0.4f;
+    public const float PotatoModeShadowDistance = 0f;
+
+    // 后台模式（窗口失焦自动触发，大幅降低渲染分辨率+帧数以省电）
+    public const int BackgroundTargetFPS = 10;
+    public const float BackgroundRenderScale = 0.1f;
+
+    // 后台模式刷新间隔（秒）— 后台不需要高频刷新
+    public const float BackgroundRunInterval = 5.0f;
 
     // ==================== 竖屏优化常量 ====================
     public const float PortraitPositionXMultiplier = 1.053f;

@@ -19,6 +19,7 @@ namespace PotatoOptimization.Core
         private CameraMirrorManager _mirrorManager;
         private PortraitModeManager _portraitManager;
         private WindowStateManager _windowManager;
+        private PiPGuiManager _pipGuiManager;
         private AudioManager _audioManager;
 
         void Start()
@@ -50,6 +51,18 @@ namespace PotatoOptimization.Core
             UpdateManagers();
         }
 
+        void OnApplicationFocus(bool hasFocus)
+        {
+            // 焦点变化时通知渲染管理器切换后台/前台模式
+            bool wasBackgroundMode = _renderManager?.IsBackgroundMode == true;
+            _renderManager?.OnFocusChanged(hasFocus);
+
+            if (hasFocus && wasBackgroundMode)
+                PotatoPlugin.Log.LogWarning(">>> 窗口获焦 → 恢复前台模式 <<<");
+            else if (!hasFocus && _renderManager?.IsBackgroundMode == true)
+                PotatoPlugin.Log.LogWarning(">>> 窗口失焦 → 后台省电模式 <<<");
+        }
+
         void OnDestroy()
         {
             // 清理资源
@@ -67,6 +80,7 @@ namespace PotatoOptimization.Core
             _mirrorManager = new CameraMirrorManager(_audioManager);
             _portraitManager = new PortraitModeManager();  // 默认禁用，由协程或用户手动启用
             _windowManager = new WindowStateManager(_config);
+            _pipGuiManager = new PiPGuiManager();
         }
 
         private void HandleHotkeyInput()
@@ -80,7 +94,7 @@ namespace PotatoOptimization.Core
             // F3 - PiP 模式
             if (Input.GetKeyDown(_config.KeyPiPMode.Value))
             {
-                StartCoroutine(_windowManager.TogglePiPMode());
+                StartCoroutine(TogglePiPMode());
             }
 
             // F4 - 相机镜像
@@ -96,10 +110,26 @@ namespace PotatoOptimization.Core
             }
         }
 
+        private IEnumerator TogglePiPMode()
+        {
+            bool enteringPiP = !_windowManager.IsSmallWindow;
+
+            // 进入时先赦免后台优化；退出时等窗口恢复完成后再恢复后台策略。
+            if (enteringPiP)
+                _renderManager.SetPiPModeActive(true);
+
+            yield return _windowManager.TogglePiPMode();
+
+            if (!enteringPiP)
+                _renderManager.SetPiPModeActive(false);
+
+            _pipGuiManager.OnPiPModeChanged(_windowManager.IsSmallWindow);
+        }
+
         private void UpdateManagers()
         {
-            // 更新土豆模式 (定期刷新设置)
-            _renderManager.UpdatePotatoMode();
+            // 更新渲染模式（定期刷新防止游戏覆盖设置）
+            _renderManager.Update();
 
             // 检测镜像模式的分辨率变化
             _mirrorManager.CheckResolutionChange();
@@ -125,11 +155,8 @@ namespace PotatoOptimization.Core
 
         private void OnSceneLoaded(Scene scene, LoadSceneMode mode)
         {
-            // 场景加载后刷新土豆模式设置
-            if (_renderManager.IsPotatoMode)
-            {
-                _renderManager.UpdatePotatoMode();
-            }
+            // 场景加载后刷新渲染模式设置
+            _renderManager?.Update();
 
             // 延迟15秒后自动镜像（如果开启自动镜像）
             if (_config != null && _config.CfgEnableMirror.Value)
