@@ -32,7 +32,7 @@ namespace PotatoOptimization.Patches
         }
 
         IsReady = TodoUIType != null && FI_OnDeleteAction != null && FI_TodoData != null;
-        PotatoPlugin.Log.LogWarning($"[TodoConfirm] Initialized. Ready={IsReady}");
+        PotatoPlugin.Log.LogInfo($"[TodoConfirm] Initialized. Ready={IsReady}");
       }
       catch (Exception e)
       {

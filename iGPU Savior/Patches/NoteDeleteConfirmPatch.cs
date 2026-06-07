@@ -19,7 +19,7 @@ namespace PotatoOptimization.Patches
     {
       try
       {
-        PotatoPlugin.Log.LogWarning("[NoteConfirm] Static constructor starting...");
+        PotatoPlugin.Log.LogInfo("[NoteConfirm] Static constructor starting...");
         var assembly = Assembly.Load("Assembly-CSharp");
         NoteServiceType = assembly.GetType("NoteService");
         if (NoteServiceType != null)
@@ -33,9 +33,9 @@ namespace PotatoOptimization.Patches
         }
 
         IsReady = NoteServiceType != null && MI_RemovePage != null;
-        PotatoPlugin.Log.LogWarning("[NoteConfirm] Initialized. Ready=" + IsReady);
-        PotatoPlugin.Log.LogWarning("[NoteConfirm] Type=" + (NoteServiceType != null ? NoteServiceType.FullName : "null"));
-        PotatoPlugin.Log.LogWarning("[NoteConfirm] RemovePage=" + (MI_RemovePage != null));
+        PotatoPlugin.Log.LogInfo("[NoteConfirm] Initialized. Ready=" + IsReady);
+        PotatoPlugin.Log.LogInfo("[NoteConfirm] Type=" + (NoteServiceType != null ? NoteServiceType.FullName : "null"));
+        PotatoPlugin.Log.LogInfo("[NoteConfirm] RemovePage=" + (MI_RemovePage != null));
       }
       catch (Exception e)
       {
@@ -45,7 +45,7 @@ namespace PotatoOptimization.Patches
 
     static MethodBase TargetMethod()
     {
-      PotatoPlugin.Log.LogWarning("[NoteConfirm] TargetMethod called. Found=" + (MI_RemovePage != null));
+      PotatoPlugin.Log.LogInfo("[NoteConfirm] TargetMethod called. Found=" + (MI_RemovePage != null));
       return MI_RemovePage;
     }
 
@@ -71,12 +71,12 @@ namespace PotatoOptimization.Patches
         {
           if (AllowedDeleteIds.Remove(pageUniqueID))
           {
-            PotatoPlugin.Log.LogWarning("[NoteConfirm] Allow original remove for pageId=" + pageUniqueID);
+            PotatoPlugin.Log.LogInfo("[NoteConfirm] Allow original remove for pageId=" + pageUniqueID);
             return true;
           }
         }
 
-        PotatoPlugin.Log.LogWarning("[NoteConfirm] Intercept remove pageId=" + pageUniqueID);
+        PotatoPlugin.Log.LogInfo("[NoteConfirm] Intercept remove pageId=" + pageUniqueID);
         var shown = ExitConfirmationDialogHelper.Show(
           "NoteDeleteConfirm",
           "NOTE_DELETE_CONFIRM_PROMPT",
@@ -84,7 +84,7 @@ namespace PotatoOptimization.Patches
           {
             try
             {
-              PotatoPlugin.Log.LogWarning("[NoteConfirm] Confirmed delete pageId=" + pageUniqueID);
+              PotatoPlugin.Log.LogInfo("[NoteConfirm] Confirmed delete pageId=" + pageUniqueID);
               lock (Gate)
               {
                 AllowedDeleteIds.Add(pageUniqueID);
@@ -99,7 +99,7 @@ namespace PotatoOptimization.Patches
           },
           () =>
           {
-            PotatoPlugin.Log.LogWarning("[NoteConfirm] Cancelled delete pageId=" + pageUniqueID);
+            PotatoPlugin.Log.LogInfo("[NoteConfirm] Cancelled delete pageId=" + pageUniqueID);
           });
 
         if (!shown)

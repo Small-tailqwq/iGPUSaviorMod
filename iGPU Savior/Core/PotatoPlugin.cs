@@ -36,7 +36,7 @@ namespace PotatoOptimization.Core
       // 创建主控制器
       CreateController();
 
-      Log.LogWarning($">>> {Constants.PluginName} v{Constants.PluginVersion} 启动成功 <<<");
+      Log.LogInfo($">>> {Constants.PluginName} v{Constants.PluginVersion} 启动成功 <<<");
     }
 
     private void ApplyHarmonyPatches()
@@ -46,44 +46,44 @@ namespace PotatoOptimization.Core
         // 强制加载补丁类到内存中，确保它们的静态构造函数被执行
         // 这很重要，因为 Harmony.PatchAll() 只能扫描已加载的类
         var todoDeleteConfirmType = typeof(TodoDeleteConfirmPatch);
-        Log.LogWarning($"[Patch Init] Loaded TodoDeleteConfirmPatch: {todoDeleteConfirmType.FullName}");
+        Log.LogInfo($"[Patch Init] Loaded TodoDeleteConfirmPatch: {todoDeleteConfirmType.FullName}");
 
         var noteDeleteConfirmType = typeof(NoteDeleteConfirmPatch);
-        Log.LogWarning($"[Patch Init] Loaded NoteDeleteConfirmPatch: {noteDeleteConfirmType.FullName}");
+        Log.LogInfo($"[Patch Init] Loaded NoteDeleteConfirmPatch: {noteDeleteConfirmType.FullName}");
 
         var noteExportPatchType = typeof(NoteExportPatch);
-        Log.LogWarning($"[Patch Init] Loaded NoteExportPatch: {noteExportPatchType.FullName}");
+        Log.LogInfo($"[Patch Init] Loaded NoteExportPatch: {noteExportPatchType.FullName}");
 
         var noteExportSelectPagePatchType = typeof(NoteExportSelectPagePatch);
-        Log.LogWarning($"[Patch Init] Loaded NoteExportSelectPagePatch: {noteExportSelectPagePatchType.FullName}");
+        Log.LogInfo($"[Patch Init] Loaded NoteExportSelectPagePatch: {noteExportSelectPagePatchType.FullName}");
 
         var noteExportSelectPageGuardPatchType = typeof(NoteExportSelectPageGuardPatch);
-        Log.LogWarning($"[Patch Init] Loaded NoteExportSelectPageGuardPatch: {noteExportSelectPageGuardPatchType.FullName}");
+        Log.LogInfo($"[Patch Init] Loaded NoteExportSelectPageGuardPatch: {noteExportSelectPageGuardPatchType.FullName}");
 
         var noteExportEditTitleGuardPatchType = typeof(NoteExportEditTitleGuardPatch);
-        Log.LogWarning($"[Patch Init] Loaded NoteExportEditTitleGuardPatch: {noteExportEditTitleGuardPatchType.FullName}");
+        Log.LogInfo($"[Patch Init] Loaded NoteExportEditTitleGuardPatch: {noteExportEditTitleGuardPatchType.FullName}");
 
         var noteExportStartReorderGuardPatchType = typeof(NoteExportStartReorderGuardPatch);
-        Log.LogWarning($"[Patch Init] Loaded NoteExportStartReorderGuardPatch: {noteExportStartReorderGuardPatchType.FullName}");
+        Log.LogInfo($"[Patch Init] Loaded NoteExportStartReorderGuardPatch: {noteExportStartReorderGuardPatchType.FullName}");
 
         var noteExportDragReorderGuardPatchType = typeof(NoteExportDragReorderGuardPatch);
-        Log.LogWarning($"[Patch Init] Loaded NoteExportDragReorderGuardPatch: {noteExportDragReorderGuardPatchType.FullName}");
+        Log.LogInfo($"[Patch Init] Loaded NoteExportDragReorderGuardPatch: {noteExportDragReorderGuardPatchType.FullName}");
 
         var noteExportEndReorderGuardPatchType = typeof(NoteExportEndReorderGuardPatch);
-        Log.LogWarning($"[Patch Init] Loaded NoteExportEndReorderGuardPatch: {noteExportEndReorderGuardPatchType.FullName}");
+        Log.LogInfo($"[Patch Init] Loaded NoteExportEndReorderGuardPatch: {noteExportEndReorderGuardPatchType.FullName}");
 
         var facilityClickMirrorType = typeof(FacilityClickHeroineMirrorPatch);
-        Log.LogWarning($"[Patch Init] Loaded FacilityClickHeroineMirrorPatch: {facilityClickMirrorType.FullName}");
+        Log.LogInfo($"[Patch Init] Loaded FacilityClickHeroineMirrorPatch: {facilityClickMirrorType.FullName}");
 
         var cursorServiceMirrorType = typeof(CursorServiceMirrorPatch);
-        Log.LogWarning($"[Patch Init] Loaded CursorServiceMirrorPatch: {cursorServiceMirrorType.FullName}");
+        Log.LogInfo($"[Patch Init] Loaded CursorServiceMirrorPatch: {cursorServiceMirrorType.FullName}");
 
         var costumePatchType = typeof(CostumePatch);
-        Log.LogWarning($"[Patch Init] Loaded CostumePatch: {costumePatchType.FullName}");
+        Log.LogInfo($"[Patch Init] Loaded CostumePatch: {costumePatchType.FullName}");
         
         var harmony = new Harmony(Constants.PluginGUID);
         harmony.PatchAll();
-        Log.LogWarning(">>> Harmony patches applied successfully! <<<");
+        Log.LogInfo(">>> Harmony patches applied successfully! <<<");
       }
       catch (Exception e)
       {

@@ -115,10 +115,12 @@ namespace PotatoOptimization.Features
             float t = 0f;
             while (t < 0.3f)
             {
+                if (go == null) yield break;
                 t += Time.deltaTime;
                 cg.alpha = Mathf.Lerp(0f, 1f, t / 0.3f);
                 yield return null;
             }
+            if (go == null) yield break;
             cg.alpha = 1f;
 
             yield return new WaitForSeconds(displayDuration);
@@ -127,6 +129,7 @@ namespace PotatoOptimization.Features
             t = 0f;
             while (t < 0.5f)
             {
+                if (go == null) yield break;
                 t += Time.deltaTime;
                 cg.alpha = Mathf.Lerp(1f, 0f, t / 0.5f);
                 yield return null;

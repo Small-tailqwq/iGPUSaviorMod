@@ -16,7 +16,7 @@ namespace PotatoOptimization.Patches
             try
             {
                 _costumeChangeServiceType = typeof(CostumeChangeService);
-                PotatoPlugin.Log.LogWarning($"[CostumePatch] Initialized. Type={_costumeChangeServiceType?.FullName}");
+                PotatoPlugin.Log.LogInfo($"[CostumePatch] Initialized. Type={_costumeChangeServiceType?.FullName}");
             }
             catch (Exception e)
             {
@@ -48,7 +48,7 @@ namespace PotatoOptimization.Patches
                     return false;
                 }
 
-                var suggestion = config.CfgSuggestedCostumeSkin.Value;
+                var suggestion = config.CfgSuggestedCostumeSkin.Value?.Trim();
                 if (!string.IsNullOrEmpty(suggestion))
                 {
                     if (Enum.TryParse<CostumeChangeService.CostumeSkinType>(suggestion, out var suggestedSkin))
