@@ -59,6 +59,8 @@ namespace PotatoOptimization.UI
 
         if (languageSupplier != null)
         {
+          _currentLang = languageSupplier.Get();
+          Refresh();
           _subscription = languageSupplier.Language.Subscribe(lang =>
           {
             _currentLang = lang;
