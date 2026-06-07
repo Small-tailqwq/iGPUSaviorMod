@@ -39,9 +39,6 @@ namespace ModShared
     private Transform _settingUIRoot;
     private bool _isBuildingUI = false;
 
-    // === 布局常量：左侧标签的强制宽度，确保对齐 ===
-    private const float LABEL_WIDTH = 380f;
-
     void Awake()
     {
       if (Instance == null)
@@ -134,11 +131,6 @@ namespace ModShared
         if (mod.Name != "General Settings" || !string.IsNullOrEmpty(mod.Version))
         {
           CreateSectionHeader(mod.Name, mod.Version);
-          // ✅ 创建 Header 后立即调整位置
-          if (mod.Name == "iGPU Savior")
-          {
-            AdjustHeaderPosition(mod.Name);
-          }
         }
 
         foreach (var item in mod.Items)
@@ -190,22 +182,20 @@ namespace ModShared
         }
         CreateDivider();
       }
-      // ✅ 最后调整 ScrollView
-      AdjustScrollViewPosition();
-
+      Canvas.ForceUpdateCanvases();
       LayoutRebuilder.ForceRebuildLayoutImmediate(_contentParent as RectTransform);
-      _isBuildingUI = false;
-    }
-    // 🆕 === 新增方法：调整 UI 位置 ===
-    // 拆分成两个方法
-    private void AdjustScrollViewPosition()
-    {
-      // Legacy code disabled - layout is now handled by ConfigureContentLayout in ModSettingsIntegration
-    }
+      Canvas.ForceUpdateCanvases();
 
-    private void AdjustHeaderPosition(string modName)
-    {
-      // Legacy code disabled
+      var scrollRect = _contentParent.GetComponentInParent<ScrollRect>();
+      if (scrollRect != null)
+      {
+        ModSettingsStyle.ConfigureScrollViewport(scrollRect);
+        LayoutRebuilder.ForceRebuildLayoutImmediate(scrollRect.GetComponent<RectTransform>());
+        scrollRect.StopMovement();
+        scrollRect.verticalNormalizedPosition = 1f;
+      }
+
+      _isBuildingUI = false;
     }
 
     private IEnumerator CreateDropdownSequence(DropdownDef def)
@@ -266,101 +256,71 @@ namespace ModShared
       yield return new WaitForSeconds(0.05f);
     }
 
-    // === 核心方法：强制修正布局（解决文字挤压问题） ===
-    // 在 ModSettingsManager.cs 中找到 EnforceLayout 方法并替换为以下内容
-
-    // === 核心方法：强制修正布局（解决文字挤压及飞出屏幕问题） ===
     private void EnforceLayout(GameObject obj)
     {
-      // 1. 【关键修复】强制重置 RectTransform 以适应 VerticalLayoutGroup
-      // 原版控件可能使用了 (0.5, 0.5) 居中或 (1, 1) 右上角锚点，这会导致在 LayoutGroup 中计算出错误的偏移
-      var rt = obj.GetComponent<RectTransform>();
-      if (rt != null)
-      {
-        // 强制设为左上角对齐，这是 VerticalLayoutGroup 最喜欢的格式
-        rt.anchorMin = new Vector2(0f, 1f);
-        rt.anchorMax = new Vector2(0f, 1f);
-        rt.pivot = new Vector2(0.5f, 1f); // X轴中心，Y轴顶部
-
-        // 修正位置和旋转
-        rt.anchoredPosition = Vector2.zero; // 让 LayoutGroup 去计算具体的 Y 轴位置
-        obj.transform.localPosition = Vector3.zero; // 双重保险
-        obj.transform.localScale = Vector3.one;
-        obj.transform.localRotation = Quaternion.identity;
-      }
-
-      // 3. 寻找 Label 并强制设置宽度 (原有逻辑保留)
-      var texts = obj.GetComponentsInChildren<TMP_Text>(true);
-      foreach (var t in texts)
-      {
-        // 只处理左侧的标题文字 (排除掉按钮内部的文字)
-        // 增加判定：通常标题是在最左边的，或者名字里包含 Title
-        // 原判定 logic: if (t.transform.position.x < obj.transform.position.x + 100 || t.name.Contains("Title"))
-        // 在 obj 位置归零前，position 对比可能不准，建议主要依赖名称或层级
-
-        if (t.name.Contains("Title") || t.name.Contains("Label") || t.name == "Text")
-        {
-          var le = t.GetComponent<LayoutElement>();
-          if (le == null) le = t.gameObject.AddComponent<LayoutElement>();
-
-          // 强制宽度 380，让右边的按钮对齐
-          le.minWidth = LABEL_WIDTH;
-          le.preferredWidth = LABEL_WIDTH;
-          le.flexibleWidth = 0;
-
-          t.alignment = TextAlignmentOptions.MidlineLeft;
-
-          break;
-        }
-      }
-
-      // 4. 确保根物体也有 LayoutElement，否则 LayoutGroup 可能把它压扁
-      var rootLE = obj.GetComponent<LayoutElement>();
-      if (rootLE == null) rootLE = obj.AddComponent<LayoutElement>();
-
-      // 给一个默认高度，防止被压成 0
-      if (rootLE.minHeight < 10) rootLE.minHeight = 60f;
-      if (rootLE.preferredHeight < 10) rootLE.preferredHeight = 60f;
+      ModSettingsStyle.PrepareRow(obj);
     }
 
     private void CreateSectionHeader(string name, string version)
     {
-      GameObject obj = new GameObject($"Header_{name}");
+      GameObject obj = new GameObject($"Header_{name}", typeof(RectTransform));
       obj.transform.SetParent(_contentParent, false);
 
-      var rect = obj.AddComponent<RectTransform>();
-      rect.sizeDelta = new Vector2(0, 55);
+      var rect = obj.GetComponent<RectTransform>();
+      rect.sizeDelta = new Vector2(ModSettingsStyle.NativeRowWidth, 64);
 
       var le = obj.AddComponent<LayoutElement>();
-      le.minHeight = 55f;
-      le.preferredHeight = 55f;
-      le.flexibleWidth = 1f;
+      le.ignoreLayout = false;
+      le.minWidth = ModSettingsStyle.NativeRowWidth;
+      le.preferredWidth = ModSettingsStyle.NativeRowWidth;
+      le.minHeight = 64f;
+      le.preferredHeight = 64f;
+      le.flexibleHeight = 0f;
+      le.flexibleWidth = 0f;
 
-      var tmp = obj.AddComponent<TextMeshProUGUI>();
-      
-      // ✅ 修复：分配原版游戏的字体，防止找不到默认字体导致 LayoutRebuilder 空指针异常
-      if (_settingUIRoot != null)
-      {
-        var existingText = _settingUIRoot.GetComponentInChildren<TMP_Text>(true);
-        if (existingText != null && existingText.font != null)
-        {
-          tmp.font = existingText.font;
-        }
-      }
+      var titleObj = new GameObject("TitleText", typeof(RectTransform));
+      titleObj.transform.SetParent(obj.transform, false);
+      var titleRect = titleObj.GetComponent<RectTransform>();
+      titleRect.anchorMin = new Vector2(0f, 0.5f);
+      titleRect.anchorMax = new Vector2(0f, 0.5f);
+      titleRect.pivot = new Vector2(0f, 0.5f);
+      titleRect.anchoredPosition = new Vector2(ModSettingsStyle.NativeTitleAnchoredX, 0f);
+      titleRect.sizeDelta = new Vector2(900f, 64f);
 
+      var tmp = titleObj.AddComponent<TextMeshProUGUI>();
       string verStr = string.IsNullOrEmpty(version) ? "" : $" <size=18><color=#888888>v{version}</color></size>";
       tmp.text = $"<size=24><b>{name}</b></size>{verStr}";
       tmp.alignment = TextAlignmentOptions.BottomLeft;
       tmp.color = Color.white;
+      tmp.margin = new Vector4(0f, 0f, 0f, 8f);
+      ModSettingsStyle.ApplySectionHeaderStyle(tmp, _settingUIRoot);
+
+      var lineObj = new GameObject("Line", typeof(RectTransform));
+      lineObj.transform.SetParent(obj.transform, false);
+      var lineRect = lineObj.GetComponent<RectTransform>();
+      lineRect.anchorMin = new Vector2(0f, 0f);
+      lineRect.anchorMax = new Vector2(1f, 0f);
+      lineRect.pivot = new Vector2(0.5f, 0f);
+      lineRect.anchoredPosition = Vector2.zero;
+      lineRect.sizeDelta = new Vector2(0f, 2f);
+      var line = lineObj.AddComponent<Image>();
+      line.color = new Color(tmp.color.r, tmp.color.g, tmp.color.b, 0.18f);
+      line.raycastTarget = false;
     }
 
     private void CreateDivider()
     {
-      GameObject obj = new GameObject("Divider");
+      GameObject obj = new GameObject("Divider", typeof(RectTransform));
       obj.transform.SetParent(_contentParent, false);
+      var rect = obj.GetComponent<RectTransform>();
+      rect.sizeDelta = new Vector2(ModSettingsStyle.NativeRowWidth, 12f);
       var le = obj.AddComponent<LayoutElement>();
-      le.minHeight = 20f;
-      le.preferredHeight = 20f;
+      le.ignoreLayout = false;
+      le.minWidth = ModSettingsStyle.NativeRowWidth;
+      le.preferredWidth = ModSettingsStyle.NativeRowWidth;
+      le.minHeight = 12f;
+      le.preferredHeight = 12f;
+      le.flexibleHeight = 0f;
     }
 
     private void UpdatePulldownSelectedText(GameObject clone, string text)
