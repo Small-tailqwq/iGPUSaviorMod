@@ -2,6 +2,7 @@ using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
 using System;
+using System.Collections;
 using System.Reflection;
 using PotatoOptimization.Core;
 using PotatoOptimization.Utilities;
@@ -96,7 +97,7 @@ namespace PotatoOptimization.UI
 
         // Keep Content always active, but ensure it's initially not visible (will be clipped by RectMask2D)
         content.gameObject.SetActive(true);
-        PotatoPlugin.Log.LogInfo("Content initialized (always active, clipped by parent)");
+        PotatoPlugin.Log.LogDebug("Content initialized (always active, clipped by parent)");
 
         // Verify PulldownButton exists
         Transform pulldownButtonTransform = clone.transform.Find("PulldownList/PulldownButton");
@@ -113,7 +114,7 @@ namespace PotatoOptimization.UI
           PotatoPlugin.Log.LogError("PulldownButton not found");
         }
 
-        PotatoPlugin.Log.LogInfo($"Successfully cloned pulldown: {clone.name}");
+        PotatoPlugin.Log.LogDebug($"Successfully cloned pulldown: {clone.name}");
         // Note: EnsurePulldownListUI will be called after parenting in CreateNativeDropdown
         return clone;
       }
@@ -500,7 +501,7 @@ namespace PotatoOptimization.UI
           if (clone.GetComponent<GraphicRaycaster>() == null)
             clone.AddComponent<GraphicRaycaster>();
 
-          PotatoPlugin.Log.LogInfo("✅ Canvas added to ROOT object (ModPulldownList)");
+          PotatoPlugin.Log.LogDebug("✅ Canvas added to ROOT object (ModPulldownList)");
         }
 
         // 🧹 清理子物体 Canvas
@@ -549,8 +550,10 @@ namespace PotatoOptimization.UI
     private Component pulldownUI;
     private Canvas targetCanvas;
     private FieldInfo isOpenField;
+    private FieldInfo closeSecondsField;
     private bool lastIsOpen = false;
     private bool isInitialized = false;
+    private Coroutine releaseSortingCoroutine;
 
     public void Initialize(Component pulldownUIComponent, Canvas canvas)
     {
@@ -560,11 +563,12 @@ namespace PotatoOptimization.UI
       if (pulldownUI != null)
       {
         isOpenField = pulldownUI.GetType().GetField("_isOpen", BindingFlags.NonPublic | BindingFlags.Instance);
+        closeSecondsField = pulldownUI.GetType().GetField("_pullDownOpenCloseSeconds", BindingFlags.NonPublic | BindingFlags.Instance);
         isInitialized = true;
 
         // 强制刷新一次状态
         UpdateSortingOrder(false);
-        PotatoPlugin.Log.LogInfo("PulldownLayerController initialized successfully");
+        PotatoPlugin.Log.LogDebug("PulldownLayerController initialized successfully");
       }
     }
 
@@ -579,7 +583,7 @@ namespace PotatoOptimization.UI
         // Only update when state changes to reduce overhead
         if (isOpen != lastIsOpen)
         {
-          UpdateSortingOrder(isOpen);
+          ApplySortingAction(PulldownLayerTransition.GetSortingAction(lastIsOpen, isOpen));
           lastIsOpen = isOpen;
         }
       }
@@ -587,6 +591,76 @@ namespace PotatoOptimization.UI
       {
         PotatoPlugin.Log.LogWarning($"[PulldownLayer] Update failed: {e.Message}");
       }
+    }
+
+    private void ApplySortingAction(PulldownLayerSortingAction action)
+    {
+      switch (action)
+      {
+        case PulldownLayerSortingAction.RaiseNow:
+          StopReleaseSortingCoroutine();
+          UpdateSortingOrder(true);
+          break;
+        case PulldownLayerSortingAction.DelayLower:
+          DelayLowerSortingOrder();
+          break;
+        case PulldownLayerSortingAction.LowerNow:
+          StopReleaseSortingCoroutine();
+          UpdateSortingOrder(false);
+          break;
+      }
+    }
+
+    private void DelayLowerSortingOrder()
+    {
+      UpdateSortingOrder(true);
+      StopReleaseSortingCoroutine();
+      releaseSortingCoroutine = StartCoroutine(ReleaseSortingAfterCloseAnimation());
+    }
+
+    private IEnumerator ReleaseSortingAfterCloseAnimation()
+    {
+      float delay = GetCloseAnimationSeconds();
+      if (delay > 0f)
+        yield return new WaitForSeconds(delay);
+
+      releaseSortingCoroutine = null;
+      if (!isInitialized || pulldownUI == null || targetCanvas == null || isOpenField == null) yield break;
+
+      bool isOpen = false;
+      try
+      {
+        isOpen = (bool)isOpenField.GetValue(pulldownUI);
+      }
+      catch (Exception e)
+      {
+        PotatoPlugin.Log.LogWarning($"[PulldownLayer] Delayed release failed: {e.Message}");
+        yield break;
+      }
+
+      if (!isOpen)
+        UpdateSortingOrder(false);
+    }
+
+    private float GetCloseAnimationSeconds()
+    {
+      if (closeSecondsField == null || pulldownUI == null) return 0f;
+
+      object value = closeSecondsField.GetValue(pulldownUI);
+      return value is float seconds ? seconds : 0f;
+    }
+
+    private void StopReleaseSortingCoroutine()
+    {
+      if (releaseSortingCoroutine == null) return;
+
+      StopCoroutine(releaseSortingCoroutine);
+      releaseSortingCoroutine = null;
+    }
+
+    private void OnDestroy()
+    {
+      StopReleaseSortingCoroutine();
     }
 
     private void UpdateSortingOrder(bool isOpen)
