@@ -89,6 +89,9 @@
     <Reference Include="UnityEngine.UIModule">
       <HintPath>$(GameDir)\Chill With You_Data\Managed\UnityEngine.UIModule.dll</HintPath>
     </Reference>
+    <Reference Include="UniTask">
+      <HintPath>$(GameDir)\Chill With You_Data\Managed\UniTask.dll</HintPath>
+    </Reference>
     <Reference Include="VContainer">
       <HintPath>$(GameDir)\Chill With You_Data\Managed\VContainer.dll</HintPath>
     </Reference>
@@ -118,6 +121,7 @@
     <Compile Include="Features\NoteExportManager.cs" />
     <Compile Include="Features\NoteExportSelectionState.cs" />
     <Compile Include="Features\PortraitModeManager.cs" />
+    <Compile Include="Features\PiPGuiManager.cs" />
     <Compile Include="Features\WindowStateManager.cs" />
     <Compile Include="Features\CostumeWhisperHelper.cs" />
     
@@ -140,6 +144,9 @@
     <Compile Include="UI\ModPulldownCloner.cs" />
     <Compile Include="UI\ModSettingsManager.cs" />
     <Compile Include="UI\ModSettingsIntegration.cs" />
+    <Compile Include="UI\ModSettingsRectLayoutSnapshot.cs" />
+    <Compile Include="UI\ModSettingsStyle.cs" />
+    <Compile Include="UI\PulldownLayerTransition.cs" />
     <Compile Include="UI\SettingUITabFieldSelector.cs" />
     <Compile Include="UI\ModToggleCloner.cs" />
     <Compile Include="UI\ModInputFieldCloner.cs" />

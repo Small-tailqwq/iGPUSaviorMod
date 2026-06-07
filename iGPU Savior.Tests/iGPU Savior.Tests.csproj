@@ -23,7 +23,11 @@
     <Compile Include="NoteExportManagerStateTests.cs" />
     <Compile Include="NoteExportStateCapturePolicyTests.cs" />
     <Compile Include="NoteExportHeaderLayoutTests.cs" />
+    <Compile Include="ModSettingsRectLayoutSnapshotTests.cs" />
+    <Compile Include="PulldownLayerTransitionTests.cs" />
     <Compile Include="..\iGPU Savior\UI\SettingUITabFieldSelector.cs" Link="SettingUITabFieldSelector.cs" />
+    <Compile Include="..\iGPU Savior\UI\ModSettingsRectLayoutSnapshot.cs" Link="ModSettingsRectLayoutSnapshot.cs" />
+    <Compile Include="..\iGPU Savior\UI\PulldownLayerTransition.cs" Link="PulldownLayerTransition.cs" />
     <Compile Include="..\iGPU Savior\Features\NoteExportFolderPicker.cs" Link="NoteExportFolderPicker.cs" />
     <Compile Include="..\iGPU Savior\Utilities\NoteExportNaming.cs" Link="NoteExportNaming.cs" />
     <Compile Include="..\iGPU Savior\Features\NoteExportManager.cs" Link="NoteExportManager.cs" />
