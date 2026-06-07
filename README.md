@@ -179,9 +179,16 @@ EnableMirrorOnStart = false
 # 注意：此功能会在场景加载后15秒自动启用，确保游戏完全初始化
 EnablePortraitMode = false
 
+[Performance]
+
+## 窗口失焦时自动温和限帧；小窗模式始终豁免
+# Setting type: Boolean
+# Default value: true
+EnableBackgroundOptimization = true
+
 [Window]
 
-## 小窗缩放比例
+## 小窗初始缩放比例（之后会优先恢复上次自由尺寸和形状）
 # Setting type: WindowScaleRatio
 # Default value: OneThird
 # 分别是三分之一，四分之一，五分之一。默认根据屏幕大小自动计算
@@ -191,9 +198,14 @@ ScaleRatio = OneThird
 ## 拖动方式
 # Setting type: DragMode
 # Default value: Ctrl_LeftClick
-# 分别是 Ctrl+左键拖动，Alt+左键拖动，右键拖动（个人推荐右键，最顺手）
+# 支持 Ctrl+左键、Alt+左键、右键按住三种模式
 # Acceptable values: Ctrl_LeftClick, Alt_LeftClick, RightClick_Hold
 DragMethod = RightClick_Hold
+
+## 进入小窗时通过游戏原生隐藏按钮自动隐藏GUI，退出时恢复
+# Setting type: Boolean
+# Default value: false
+AutoHideGuiInPiP = false
 ```
 
 ## 🚀 使用方法

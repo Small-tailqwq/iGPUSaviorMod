@@ -83,9 +83,16 @@ EnableMirrorOnStart = false
 # Default value: false
 EnablePortraitMode = false
 
+[Performance]
+
+## 窗口失焦时自动温和限帧；小窗模式始终豁免
+# Setting type: Boolean
+# Default value: true
+EnableBackgroundOptimization = true
+
 [Window]
 
-## 小窗缩放比例
+## 小窗初始缩放比例（之后会优先恢复上次自由尺寸和形状）
 # Setting type: WindowScaleRatio
 # Default value: OneThird
 # Acceptable values: OneThird, OneFourth, OneFifth
@@ -93,9 +100,14 @@ ScaleRatio = OneThird
 
 ## 拖动方式
 # Setting type: DragMode
-# Default value: RightClick_Hold
+# Default value: Ctrl_LeftClick
 # Acceptable values: Ctrl_LeftClick, Alt_LeftClick, RightClick_Hold
 DragMethod = RightClick_Hold
+
+## 进入小窗时自动隐藏GUI，退出时恢复
+# Setting type: Boolean
+# Default value: false
+AutoHideGuiInPiP = false
 ```
 
 ## 🎮 使用方法
