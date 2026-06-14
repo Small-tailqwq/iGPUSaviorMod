@@ -8,7 +8,7 @@ namespace PotatoOptimization.UI
   internal static class ModSettingsStyle
   {
     internal const float NativeRowWidth = 1260f;
-    private const float NativeRowHeight = 60.9f;
+    internal const float NativeRowHeight = 60.9f;
     internal const float NativeTitleAnchoredX = 324f;
     private const float MinimumTitleWidth = 360f;
     private const float ViewportTitleInset = 64f;

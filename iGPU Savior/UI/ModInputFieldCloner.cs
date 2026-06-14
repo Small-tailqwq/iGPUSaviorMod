@@ -9,6 +9,8 @@ namespace PotatoOptimization.UI
 {
   public class ModInputFieldCloner
   {
+    private const float InputFrameHeight = 50f;
+
     public static GameObject CreateInputField(
         Transform modContent,
         string labelText,
@@ -81,8 +83,11 @@ namespace PotatoOptimization.UI
             frameRect.anchorMax = new Vector2(0.5f, 0.5f);
             frameRect.pivot = new Vector2(0.5f, 0.5f);
 
-            frameRect.anchoredPosition = Vector2.zero; // 居中
-            frameRect.sizeDelta = new Vector2(1260f, 50f); // 高度限制为50
+            // Keep the 50px visual input frame top-aligned inside the native row height.
+            // Otherwise the following row gets pulled too close to input fields.
+            float verticalOffset = (ModSettingsStyle.NativeRowHeight - InputFrameHeight) * 0.5f;
+            frameRect.anchoredPosition = new Vector2(0f, verticalOffset);
+            frameRect.sizeDelta = new Vector2(1260f, InputFrameHeight);
           }
 
           // B. 文本对齐 (-306)
@@ -166,9 +171,9 @@ namespace PotatoOptimization.UI
         // E. 行高控制
         var le = clone.GetComponent<LayoutElement>();
         if (le == null) le = clone.AddComponent<LayoutElement>();
-        // 强制高度 50，消除上下多余空隙
-        le.minHeight = 50f;
-        le.preferredHeight = 50f;
+        // Use the same row height as native setting rows; the visual input frame remains 50px.
+        le.minHeight = ModSettingsStyle.NativeRowHeight;
+        le.preferredHeight = ModSettingsStyle.NativeRowHeight;
         le.flexibleHeight = 0;
 
         return clone;
