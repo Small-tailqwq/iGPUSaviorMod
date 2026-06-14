@@ -489,7 +489,7 @@ namespace ModShared
 
       // 检测不支持的条件链：自身有条件，同时又被其他条件依赖
       var controllerKeys = new HashSet<string>(
-          mod.Items.Where(i => i.Condition != null).Select(i => i.Key));
+          mod.Items.Where(i => i.Condition != null).Select(i => i.Condition.TargetKey));
       foreach (var item in mod.Items)
       {
         if (item.Condition == null) continue;
