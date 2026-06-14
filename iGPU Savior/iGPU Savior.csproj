@@ -150,6 +150,7 @@
     <Compile Include="UI\SettingUITabFieldSelector.cs" />
     <Compile Include="UI\ModToggleCloner.cs" />
     <Compile Include="UI\ModInputFieldCloner.cs" />
+    <Compile Include="UI\VisibleWhen.cs" />
     <Compile Include="UI\Localization\ModLocalizer.cs" />
     <Compile Include="UI\Localization\ModTranslationManager.cs" />
     
