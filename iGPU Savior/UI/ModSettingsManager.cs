@@ -300,7 +300,7 @@ namespace ModShared
       for (int i = 0; i < def.Options.Count; i++)
       {
         int idx = i;
-        ModPulldownCloner.AddOption(pulldownClone, buttonTemplate, def.Options[i], () => wrapped?.Invoke(idx));
+        ModPulldownCloner.AddOption(pulldownClone, buttonTemplate, def.Options[i], () => wrapped.Invoke(idx));
       }
 
       if (def.DefaultIndex >= 0 && def.DefaultIndex < def.Options.Count)
@@ -486,6 +486,21 @@ namespace ModShared
         bool visible = EvaluateVisibility(mod, item, out _);
         if (ApplyVisibility(item, visible)) changed = true;
       }
+
+      // 检测不支持的条件链：自身有条件，同时又被其他条件依赖
+      var controllerKeys = new HashSet<string>(
+          mod.Items.Where(i => i.Condition != null).Select(i => i.Key));
+      foreach (var item in mod.Items)
+      {
+        if (item.Condition == null) continue;
+        if (controllerKeys.Contains(item.Key))
+        {
+          LogVisibilityWarningOnce(
+              item,
+              $"Configuration item '{item.Key}' has a condition and is also a condition target; chained conditions are not supported");
+        }
+      }
+
       if (changed)
         LayoutRebuilder.ForceRebuildLayoutImmediate(_contentParent as RectTransform);
     }
