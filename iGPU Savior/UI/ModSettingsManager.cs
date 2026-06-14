@@ -42,6 +42,7 @@ namespace ModShared
     private class InputFieldDef : SettingItemDef
     {
       public string DefaultValue;
+      public string CurrentValue;
       public Action<string> OnValueChanged;
     }
 
@@ -164,6 +165,7 @@ namespace ModShared
         Label = labelText,
         Owner = owner,
         DefaultValue = defaultValue,
+        CurrentValue = defaultValue,
         OnValueChanged = onValueChanged,
         Condition = visibleWhen
       };
@@ -222,11 +224,12 @@ namespace ModShared
               continue;
             }
 
+            Action<string> wrapped = WrapInputCallback(inputDef);
             row = ModInputFieldCloner.CreateInputField(
                 graphicsContent,
                 inputDef.Label,
                 inputDef.DefaultValue,
-                inputDef.OnValueChanged);
+                wrapped);
 
             if (row != null)
             {
@@ -456,24 +459,48 @@ namespace ModShared
       };
     }
 
+    private Action<string> WrapInputCallback(InputFieldDef input)
+    {
+      Action<string> original = input.OnValueChanged;
+      return (value) =>
+      {
+        input.CurrentValue = value;
+        try
+        {
+          RefreshDependents(input.Owner, input);
+        }
+        catch (Exception e)
+        {
+          PotatoOptimization.Core.PotatoPlugin.Log.LogWarning($"[ModSettings] 刷新依赖失败: {e.Message}");
+        }
+        original?.Invoke(value);
+      };
+    }
+
     private void ApplyInitialVisibilityForMod(ModData mod)
     {
+      bool changed = false;
       foreach (var item in mod.Items)
       {
         if (item.Condition == null) continue;
         bool visible = EvaluateVisibility(mod, item, out _);
-        ApplyVisibility(item, visible);
+        if (ApplyVisibility(item, visible)) changed = true;
       }
+      if (changed)
+        LayoutRebuilder.ForceRebuildLayoutImmediate(_contentParent as RectTransform);
     }
 
     private void RefreshDependents(ModData owner, SettingItemDef controller)
     {
+      bool changed = false;
       var dependents = owner.Items.Where(i => i.Condition != null && i.Condition.TargetKey == controller.Key);
       foreach (var dependent in dependents)
       {
         bool visible = EvaluateVisibility(owner, dependent, out _);
-        ApplyVisibility(dependent, visible);
+        if (ApplyVisibility(dependent, visible)) changed = true;
       }
+      if (changed)
+        LayoutRebuilder.ForceRebuildLayoutImmediate(_contentParent as RectTransform);
     }
 
     private bool EvaluateVisibility(ModData owner, SettingItemDef dependent, out string failureReason)
@@ -523,13 +550,27 @@ namespace ModShared
         };
       }
 
+      if (item is InputFieldDef input)
+      {
+        return new SettingValueSnapshot
+        {
+          Kind = SettingValueKind.InputField,
+          InputValue = input.CurrentValue
+        };
+      }
+
       return null;
     }
 
-    private void ApplyVisibility(SettingItemDef item, bool visible)
+    private bool ApplyVisibility(SettingItemDef item, bool visible)
     {
-      if (!_itemUIs.TryGetValue(item, out GameObject row) || row == null) return;
-      if (row.activeSelf == visible) return;
+      if (!_itemUIs.TryGetValue(item, out GameObject row) || row == null)
+      {
+        PotatoOptimization.Core.PotatoPlugin.Log.LogDebug(
+            $"[ModSettings] 找不到 '{item.Key}' 的 UI 行，跳过可见性设置。");
+        return false;
+      }
+      if (row.activeSelf == visible) return false;
 
       if (!visible)
       {
@@ -537,7 +578,7 @@ namespace ModShared
       }
 
       row.SetActive(visible);
-      LayoutRebuilder.ForceRebuildLayoutImmediate(_contentParent as RectTransform);
+      return true;
     }
 
     private void LogVisibilityWarningOnce(SettingItemDef item, string reason)

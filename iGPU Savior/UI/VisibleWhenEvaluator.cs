@@ -6,7 +6,8 @@ namespace ModShared
     internal enum SettingValueKind
     {
         Toggle,
-        Dropdown
+        Dropdown,
+        InputField
     }
 
     internal sealed class SettingValueSnapshot
@@ -15,6 +16,7 @@ namespace ModShared
         public bool ToggleValue;
         public int DropdownIndex;
         public IReadOnlyList<string> DropdownOptions;
+        public string InputValue;
     }
 
     internal static class VisibleWhenEvaluator

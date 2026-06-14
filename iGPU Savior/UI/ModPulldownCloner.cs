@@ -562,7 +562,7 @@ namespace PotatoOptimization.UI
       }
       catch (Exception e)
       {
-        PotatoOptimization.Core.PotatoPlugin.Log.LogWarning($"[ModPulldownCloner] TryClosePulldown failed: {e.Message}");
+        PotatoPlugin.Log.LogWarning($"[ModPulldownCloner] TryClosePulldown failed: {e.Message}");
         return false;
       }
     }
