@@ -1,137 +1,101 @@
 # MOD 设置 API 使用指南
 
-## 概述
+`ModSettingsManager` 是一个单例，负责把外部 MOD 的设置项加入游戏设置界面的 `MOD` 标签页。外部 MOD 只注册设置数据，UI 构建、布局、多语言刷新和条件显隐由 iGPU Savior 自动处理。
 
-`ModSettingsManager` 是一个单例，管理游戏设置界面中的"MOD"标签页。多个 MOD 共享同一个标签页，每个 MOD 注册自己的设置项（Toggle、Dropdown、InputField），系统自动克隆游戏原生 UI 模板来构建界面，保证视觉风格与游戏完全一致。
-
-## 完整流程
+## 基本流程
 
 ```csharp
-// 1. 注册 MOD
-ModSettingsManager.Instance.RegisterMod("My Mod", "1.0.0");
+var manager = ModSettingsManager.Instance;
+if (manager?.IsInitialized != true) return;
 
-// 2. (可选) 注册多语言翻译
-ModSettingsManager.Instance.RegisterTranslation("SETTING_ENABLE_FEATURE", 
-    "Enable Feature", "機能を有効化", "启用功能");
+manager.RegisterMod("My Mod", "1.0.0");
 
-// 3. 添加设置项 — 支持翻译 Key 或直接写文本
-ModSettingsManager.Instance.AddToggle("SETTING_ENABLE_FEATURE", true, val => Config.Enabled.Value = val);
-ModSettingsManager.Instance.AddDropdown("SETTING_QUALITY", 
-    new List<string> { "Low", "Medium", "High" }, 1, idx => SetQuality(idx));
-ModSettingsManager.Instance.AddInputField("Frame Rate", "60", val => SetFPS(val));
+manager.RegisterTranslation("MYMOD_ENABLE", "Enable Feature", "機能を有効化", "启用功能");
+manager.RegisterTranslation("MYMOD_QUALITY", "Quality", "品質", "质量");
+manager.RegisterTranslation("MYMOD_LOW", "Low", "低", "低");
+manager.RegisterTranslation("MYMOD_HIGH", "High", "高", "高");
 
-// 4. 构建 UI（由 ModSettingsIntegration 自动调用，或手动触发）
-ModSettingsManager.Instance.RebuildUI(contentParent, settingUIRoot);
+manager.AddToggle("MYMOD_ENABLE", true, value => SaveEnable(value));
+manager.AddDropdown("MYMOD_QUALITY", new List<string> { "MYMOD_LOW", "MYMOD_HIGH" }, 1,
+    index => SaveQuality(index));
+manager.AddInputField("MYMOD_FPS", "60", value => SaveFps(value));
 ```
 
-## API 参考
-
-### RegisterMod
+## 公开 API
 
 ```csharp
-void RegisterMod(string modName, string modVersion)
+public static ModSettingsManager Instance { get; }
+public bool IsInitialized { get; }
+
+void RegisterMod(string modName, string modVersion);
+void RegisterTranslation(string key, string en, string ja, string zh);
+
+void AddToggle(string labelOrKey, bool defaultValue, Action<bool> onValueChanged);
+void AddToggle(string labelOrKey, bool defaultValue, Action<bool> onValueChanged,
+               VisibleWhenCondition visibleWhen);
+
+void AddDropdown(string labelOrKey, List<string> options, int defaultIndex,
+                 Action<int> onValueChanged);
+void AddDropdown(string labelOrKey, List<string> options, int defaultIndex,
+                 Action<int> onValueChanged, VisibleWhenCondition visibleWhen);
+
+void AddInputField(string labelOrKey, string defaultValue, Action<string> onValueChanged);
+void AddInputField(string labelOrKey, string defaultValue, Action<string> onValueChanged,
+                   VisibleWhenCondition visibleWhen);
 ```
 
-注册一个 MOD 到共享标签页。重名 MOD 会复用已有条目，参数不会被覆盖。注册后进入"当前 MOD"状态，后续的 `AddToggle/Dropdown/InputField` 调用都将归属到这个 MOD。
+`RebuildUI(Transform contentParent, Transform settingUIRoot)` 是内部构建入口，通常由 `ModSettingsIntegration` 自动调用；外部 MOD 不应依赖内部 UI 容器。
 
-### RegisterTranslation
+## 条件可见性
 
 ```csharp
-void RegisterTranslation(string key, string en, string ja, string zh)
+manager.AddToggle("MYMOD_ADVANCED", false, SaveAdvanced);
+
+manager.AddInputField(
+    "MYMOD_ADVANCED_VALUE",
+    "",
+    SaveAdvancedValue,
+    VisibleWhen.Toggle("MYMOD_ADVANCED", true));
 ```
-
-注册一个翻译键。在所有 `AddToggle/Dropdown/InputField` 之前调用，之后调用 `AddXxx(key, ...)` 时系统会自动根据当前语言查找翻译文本。未找到翻译时回退显示 key 原始值。
-
-### AddToggle
 
 ```csharp
-void AddToggle(string labelOrKey, bool defaultValue, Action<bool> onValueChanged)
+manager.AddDropdown("MYMOD_PROVIDER", new List<string> { "OPENMETEO", "SENIVERSE" }, 0, SaveProvider);
+
+manager.AddInputField(
+    "MYMOD_LATITUDE",
+    "",
+    SaveLatitude,
+    VisibleWhen.DropdownOption("MYMOD_PROVIDER", "OPENMETEO"));
+
+manager.AddInputField(
+    "MYMOD_CITY",
+    "",
+    SaveCity,
+    VisibleWhen.DropdownIndex("MYMOD_PROVIDER", 1));
 ```
 
-创建一个 ON/OFF 开关。系统会克隆游戏原生 Audio 设置中的 PomodoroSound 开关模板。labelOrKey 可以是翻译 key（需先 RegisterTranslation）或直接文本字符串。
+## 条件规则
 
-### AddDropdown
+- `VisibleWhen.DropdownOption(targetKey, expectedOption)`：下拉当前选项等于指定选项时显示。
+- `VisibleWhen.DropdownIndex(targetKey, expectedIndex)`：下拉当前索引等于指定索引时显示。
+- `VisibleWhen.Toggle(targetKey, expectedValue)`：开关当前值等于指定值时显示。
 
-```csharp
-void AddDropdown(string labelOrKey, List<string> options, int defaultIndex, Action<int> onValueChanged)
-```
+条件目标在同一个 MOD 分组内查找。目标不存在、重复或类型不匹配时采用 fail-open：设置项保持可见，并输出一次警告。
 
-创建一个下拉选择框。系统会克隆游戏原生 Graphics 设置中的 GraphicQuality 下拉框模板。选项数量 > 6 时自动创建 ScrollRect 滚动区域。
+## 内部机制简述
 
-options 列表中的字符串同样支持翻译 key：若已在 `RegisterTranslation` 注册过，自动翻译显示文本。
+`RebuildUI()` 会按 MOD 分组遍历注册项，使用游戏原生模板构建控件：
 
-### AddInputField
+- Toggle：`ModToggleCloner`
+- Dropdown：`ModPulldownCloner`
+- InputField：`ModInputFieldCloner`
 
-```csharp
-void AddInputField(string labelText, string defaultValue, Action<string> onValueChanged)
-```
+每个控件会经过 `ModSettingsStyle.PrepareRow()` 对齐，文本会通过 `ModLocalizer` 响应语言切换。
 
-创建一个文本输入框。系统会克隆游戏原生 Graphics 设置中的 FrameRate 输入框模板。
+## 注意事项
 
-### RebuildUI
-
-```csharp
-void RebuildUI(Transform contentParent, Transform settingUIRoot)
-```
-
-构建（或重建）整个 MOD 标签页 UI。`contentParent` 是 MOD 内容面板的 Transform，`settingUIRoot` 是游戏设置界面的根 Transform（用于查找克隆模板）。此方法由 `ModSettingsIntegration` 在标签切换时自动调用，但也可手动触发。
-
-### IsInitialized (兼容性属性)
-
-```csharp
-bool IsInitialized { get; }
-```
-
-返回 true 表示 `ModSettingsManager.Instance` 可用。用于外部 MOD 兼容性检测。`Instance` 本身通过 `DontDestroyOnLoad` 保证跨场景存活。
-
-## 内部机制
-
-### UI 构建
-
-`RebuildUI()` 启动 `BuildSequence()` 协程，对每个注册的 MOD：
-
-1. `CreateSectionHeader()` — 创建加粗标题栏（如 "iGPU Savior v1.6.0"）
-2. 遍历设置项，分派给对应 Cloner：
-   - ToggleDef → `ModToggleCloner.CreateToggle()`
-   - DropdownDef → `CreateDropdownSequence()` → `ModPulldownCloner`
-   - InputFieldDef → `ModInputFieldCloner.CreateInputField()`
-3. `EnforceLayout()` — 强制左上锚点、380px 标签宽度、60px 最小行高
-4. `CreateDivider()` — 添加 20px 分隔线
-
-### Cloner 机制
-
-系统不手动绘制 UI，而是从游戏运行时场景中找到既有的设置控件模板并 Instantiate 克隆，然后清空子项、替换数据和回调。好处是视觉风格与游戏原生完全一致，无需手动维护样式参数。
-
-- **ModToggleCloner** — 查找 Graphics→Content 下的 `PomodoroSoundOnOffButtons` 作为模板
-- **ModPulldownCloner** — 查找 Graphics→Content 下的 `GraphicQualityPulldownList` 作为模板
-- **ModInputFieldCloner** — 查找 Graphics→Content 下的 `FrameRate` 行作为模板
-
-### 布局强制
-
-`EnforceLayout()` 对每个克隆后的控件进行：
-
-- 强制 anchorMin/Max 为 (0, 1)（左上对齐，适配 VerticalLayoutGroup）
-- 将名字含 Title/Label/Text 的子 TMP_Text 强制 `minWidth=380f`，确保与左侧标签对齐
-- 设置根 `LayoutElement.minHeight=60f`，防止被压成 0
-
-### 未注册 MOD 的回退处理
-
-如果外部 MOD 直接调用 `AddToggle()` 而未先调用 `RegisterMod()`，系统自动将其设置归入名为 "General Settings" 的匿名 MOD 组（不显示标题），确保向后兼容。
-
-## 当前已注册的设置
-
-iGPU Savior 在 `ModSettingsIntegration.RegisterCurrentMod()` 中注册了：
-
-| 设置 | 类型 | 翻译 Key |
-|------|------|----------|
-| 镜像模式自动开启 | Toggle | `SETTING_MIRROR_AUTO` |
-| 竖屏模式自动开启 | Toggle | `SETTING_PORTRAIT_AUTO` |
-| 删除确认 | Toggle | `SETTING_DELETE_CONFIRM` |
-| 小窗缩放 | Dropdown | `SETTING_MINI_SCALE` |
-| 拖动模式 | Dropdown | `SETTING_DRAG_MODE` |
-| 土豆模式热键 | Dropdown | `SETTING_KEY_POTATO` |
-| 小窗模式热键 | Dropdown | `SETTING_KEY_PIP` |
-| 镜像模式热键 | Dropdown | `SETTING_KEY_MIRROR` |
-| 竖屏模式热键 | Dropdown | `SETTING_KEY_PORTRAIT` |
-
-具体配置值定义在 `Configuration/ConfigurationManager.cs` 中。
+- 未调用 `RegisterMod()` 直接 `Add*()` 时，设置会进入匿名 `General Settings` 分组；建议外部 MOD 显式调用。
+- `RegisterTranslation()` 必须在使用对应 key 的 `Add*()` 之前调用。
+- 同一 MOD 分组内 key 保持唯一，尤其是条件控制项。
+- 注册逻辑只执行一次，避免重复行。
+- 回调中做耗时操作时建议自行异步处理，避免卡 UI。

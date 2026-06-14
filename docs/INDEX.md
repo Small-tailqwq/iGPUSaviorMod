@@ -27,7 +27,7 @@
 ### API 使用
 
 - [MOD_SETTINGS_USAGE.md](./mod_settings/MOD_SETTINGS_USAGE.md) — `RegisterMod` / `AddToggle` / `AddDropdown` / `AddInputField` / `RegisterTranslation` / `RebuildUI` 完整 API 参考
-- [MIGRATION_GUIDE_FOR_EXTERNAL_MODS.md](./MIGRATION_GUIDE_FOR_EXTERNAL_MODS.md) — 外部 MOD 如何接入这个 API（旧文档，仅供参考）
+- [MIGRATION_GUIDE_FOR_EXTERNAL_MODS.md](./MIGRATION_GUIDE_FOR_EXTERNAL_MODS.md) — 外部 MOD 快速接入指南（含条件可见性示例）
 
 ### 架构与技术细节
 

@@ -158,8 +158,9 @@ README (2 min)
 ### API 功能
 - ✅ `AddToggle()` - 添加开关
 - ✅ `AddDropdown()` - 添加下拉菜单
+- ✅ `AddInputField()` - 添加输入框
+- ✅ `VisibleWhen` - 条件可见性
 - ✅ `ModSettingsManager.Instance` - 单例访问
-- ✅ `ModContentParent` - 容器访问
 - ✅ 属性和初始化
 
 ### 开发场景

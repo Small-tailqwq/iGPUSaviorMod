@@ -1,549 +1,279 @@
-# 🏘️ MOD 设置集成指南
+# MOD 设置集成指南
 
-欢迎其他 MOD 作者！这份文档将帮助你轻松地将你的设置集成到游戏自带的设置界面。
+这份文档面向外部 MOD 作者：如何把自己的配置项接入 iGPU Savior 提供的共享 `MOD` 设置标签页。
 
-**如果你对我们的 MOD 框架有依赖，你可以在设置界面中添加你自己的设置项，就像在一个共享的"房间"里装修一样。**
+核心原则很简单：外部 MOD 只注册设置项定义，iGPU Savior 负责克隆游戏原生 UI、布局、多语言刷新和条件显隐。
 
----
+## 快速开始
 
-## 📋 目录
-1. [快速开始](#快速开始)
-2. [核心概念](#核心概念)
-3. [API 文档](#api-文档)
-4. [完整示例](#完整示例)
-5. [最佳实践](#最佳实践)
-6. [常见问题](#常见问题)
-7. [故障排查](#故障排查)
+### 1. 引用 iGPU Savior
 
----
-
-## 🚀 快速开始
-
-### 1. 添加项目引用
-在你的 `.csproj` 文件中添加对 `ModShared` 命名空间的引用：
+在你的 `.csproj` 中引用已安装的 `iGPU Savior.dll`：
 
 ```xml
 <ItemGroup>
-    <Reference Include="ModShared">
-        <HintPath>../iGPU Savior/bin/Release/iGPU Savior.dll</HintPath>
-    </Reference>
+  <Reference Include="iGPU Savior">
+    <HintPath>..\BepInEx\plugins\iGPU Savior.dll</HintPath>
+  </Reference>
 </ItemGroup>
 ```
 
-### 2. 导入命名空间
+然后导入命名空间：
+
 ```csharp
 using ModShared;
+using System.Collections;
+using System.Collections.Generic;
 ```
 
-### 3. 在你的插件初始化时添加设置
+### 2. 等待设置管理器初始化
+
 ```csharp
-public class YourModPlugin
+private bool _settingsRegistered;
+
+private void Start()
 {
-    void Awake()
-    {
-        // 等待设置界面初始化
-        if (ModSettingsManager.Instance != null && ModSettingsManager.Instance.IsInitialized)
-        {
-            AddYourSettings();
-        }
-    }
+    StartCoroutine(RegisterSettingsWhenReady());
+}
 
-    void AddYourSettings()
-    {
-        var modManager = ModSettingsManager.Instance;
-        var contentParent = modManager.ModContentParent;
+private IEnumerator RegisterSettingsWhenReady()
+{
+    while (ModSettingsManager.Instance?.IsInitialized != true)
+        yield return null;
 
-        // 添加开关
-        modManager.AddToggle(contentParent, "启用你的功能", true, (value) =>
-        {
-            Debug.Log($"功能状态: {value}");
-        });
+    if (_settingsRegistered) yield break;
 
-        // 添加下拉菜单
-        modManager.AddDropdown(contentParent, "选择模式", 
-            new List<string> { "模式A", "模式B", "模式C" }, 
-            0,
-            (selectedIndex) =>
-            {
-                Debug.Log($"选中: {selectedIndex}");
-            });
-    }
+    RegisterSettings(ModSettingsManager.Instance);
+    _settingsRegistered = true;
 }
 ```
 
----
-
-## 💡 核心概念
-
-### 架构设计
-
-```
-游戏设置界面 (SettingUI)
-├── 常规 (General)
-├── 图形 (Graphic)
-├── 音频 (Audio)
-├── 制作人员 (Credits)
-└── MOD ⭐ (我们的共享区域)
-    ├── 你的 MOD 设置
-    ├── 他人的 MOD 设置
-    └── ...
-```
-
-### 生命周期
-
-1. **游戏启动** → iGPU Savior 插件初始化
-2. **SettingUI.Setup()** → Harmony 补丁创建 MOD 标签页
-3. **ModSettingsManager 初始化** → 设置界面准备就绪
-4. **其他 MOD 插件** → 检查 `ModSettingsManager.Instance.IsInitialized`
-5. **添加设置项** → 调用 `AddToggle()` / `AddDropdown()` 等方法
-
----
-
-## 📚 API 文档
-
-### ModSettingsManager
-
-#### 属性
-
-| 属性 | 类型 | 说明 |
-|------|------|------|
-| `Instance` | `ModSettingsManager` | 单例实例（静态） |
-| `ModContentParent` | `GameObject` | 设置内容的根容器 |
-| `ModTabButton` | `GameObject` | MOD 标签按钮 |
-| `ModScrollRect` | `ScrollRect` | 滚动视图（用于动态内容布局） |
-| `IsInitialized` | `bool` | 是否已初始化 |
-
-#### 方法
-
-##### `AddToggle()`
-添加一个开关/复选框。
+### 3. 注册你的设置
 
 ```csharp
-public GameObject AddToggle(
-    GameObject parent,              // 父容器（通常是 ModContentParent）
-    string label,                   // 显示的标签文本
-    bool defaultValue,              // 默认状态
-    Action<bool> onValueChanged     // 值变化时的回调
-)
-```
+private void RegisterSettings(ModSettingsManager manager)
+{
+    manager.RegisterMod("My Mod", "1.0.0");
 
-**返回值**: 设置行的 GameObject，包含标签和开关。
+    manager.RegisterTranslation("MYMOD_ENABLE", "Enable Feature", "機能を有効化", "启用功能");
+    manager.RegisterTranslation("MYMOD_MODE", "Mode", "モード", "模式");
+    manager.RegisterTranslation("MYMOD_MODE_A", "Mode A", "モード A", "模式 A");
+    manager.RegisterTranslation("MYMOD_MODE_B", "Mode B", "モード B", "模式 B");
 
-**示例**:
-```csharp
-modManager.AddToggle(
-    contentParent, 
-    "启用后处理效果", 
-    true, 
-    (isEnabled) =>
+    manager.AddToggle("MYMOD_ENABLE", true, enabled =>
     {
-        SaveYourSetting("PostProcessing", isEnabled);
-    }
-);
+        // Config.Enable.Value = enabled;
+    });
+
+    manager.AddDropdown(
+        "MYMOD_MODE",
+        new List<string> { "MYMOD_MODE_A", "MYMOD_MODE_B" },
+        0,
+        index =>
+        {
+            // Config.Mode.Value = index;
+        });
+}
 ```
 
-##### `AddDropdown()`
-添加一个下拉选择菜单。
+## 当前 API
+
+### RegisterMod
 
 ```csharp
-public GameObject AddDropdown(
-    GameObject parent,              // 父容器
-    string label,                   // 显示的标签文本
-    List<string> options,           // 选项列表
-    int defaultIndex,               // 默认选中的索引
-    Action<int> onValueChanged      // 选项变化时的回调（参数是选中索引）
-)
+void RegisterMod(string modName, string modVersion);
 ```
 
-**返回值**: 设置行的 GameObject。
+注册一个 MOD 分组。后续 `AddToggle`、`AddDropdown`、`AddInputField` 都会归属到最近一次注册的 MOD 分组。
 
-**示例**:
+同名 MOD 再次注册会复用已有分组，后续 `Add*()` 会继续追加。
+
+### RegisterTranslation
+
 ```csharp
-modManager.AddDropdown(
-    contentParent,
-    "画质预设",
-    new List<string> { "低", "中", "高", "超高" },
-    2,
-    (selectedIndex) =>
-    {
-        string[] qualities = { "Low", "Medium", "High", "Ultra" };
-        ApplyQuality(qualities[selectedIndex]);
-    }
-);
+void RegisterTranslation(string key, string en, string ja, string zh);
 ```
 
----
+注册多语言文本。`labelOrKey` 和下拉框选项都支持翻译 key。未注册时会直接显示传入字符串。
 
-## 🎨 完整示例
+### AddToggle
 
-### 示例 1: 简单的功能开关 MOD
+```csharp
+void AddToggle(string labelOrKey, bool defaultValue, Action<bool> onValueChanged);
+void AddToggle(string labelOrKey, bool defaultValue, Action<bool> onValueChanged,
+               VisibleWhenCondition visibleWhen);
+```
+
+添加一个开关。回调参数是新的 bool 值。
+
+### AddDropdown
+
+```csharp
+void AddDropdown(string labelOrKey, List<string> options, int defaultIndex,
+                 Action<int> onValueChanged);
+void AddDropdown(string labelOrKey, List<string> options, int defaultIndex,
+                 Action<int> onValueChanged, VisibleWhenCondition visibleWhen);
+```
+
+添加一个下拉框。回调参数是选中项索引。`options` 中的字符串也可以是翻译 key。
+
+### AddInputField
+
+```csharp
+void AddInputField(string labelOrKey, string defaultValue, Action<string> onValueChanged);
+void AddInputField(string labelOrKey, string defaultValue, Action<string> onValueChanged,
+                   VisibleWhenCondition visibleWhen);
+```
+
+添加一个单行文本输入框。回调在结束编辑时触发。
+
+## 条件可见性
+
+给 `Add*()` 传入 `visibleWhen` 后，该设置项会根据同一 MOD 分组内的另一个设置项实时显示或隐藏。
+
+```csharp
+private void RegisterWeatherSettings(ModSettingsManager manager)
+{
+    manager.RegisterMod("Weather Sync", "2.0.0");
+
+    manager.RegisterTranslation("WEATHER_PROVIDER", "Provider", "プロバイダー", "天气源");
+    manager.RegisterTranslation("WEATHER_OPENMETEO", "Open-Meteo", "Open-Meteo", "Open-Meteo");
+    manager.RegisterTranslation("WEATHER_SENIVERSE", "Seniverse", "心知天气", "心知天气");
+    manager.RegisterTranslation("WEATHER_LATITUDE", "Latitude", "緯度", "纬度");
+    manager.RegisterTranslation("WEATHER_CITY", "City", "都市", "城市");
+
+    manager.AddDropdown(
+        "WEATHER_PROVIDER",
+        new List<string> { "WEATHER_OPENMETEO", "WEATHER_SENIVERSE" },
+        0,
+        index => { /* SaveProvider(index); */ });
+
+    manager.AddInputField(
+        "WEATHER_LATITUDE",
+        "",
+        value => { /* SaveLatitude(value); */ },
+        VisibleWhen.DropdownOption("WEATHER_PROVIDER", "WEATHER_OPENMETEO"));
+
+    manager.AddInputField(
+        "WEATHER_CITY",
+        "",
+        value => { /* SaveCity(value); */ },
+        VisibleWhen.DropdownOption("WEATHER_PROVIDER", "WEATHER_SENIVERSE"));
+}
+```
+
+可用条件：
+
+| 方法 | 显示条件 |
+| --- | --- |
+| `VisibleWhen.DropdownOption(targetKey, expectedOption)` | 目标下拉框当前选项等于 `expectedOption` |
+| `VisibleWhen.DropdownIndex(targetKey, expectedIndex)` | 目标下拉框当前索引等于 `expectedIndex` |
+| `VisibleWhen.Toggle(targetKey, expectedValue)` | 目标开关当前值等于 `expectedValue` |
+
+条件目标只在同一个 MOD 分组内查找。目标 key 不存在、重复或类型不匹配时，被控制项会保持可见，并输出一次警告。
+
+## 完整示例
 
 ```csharp
 using BepInEx;
-using BepInEx.Logging;
-using UnityEngine;
 using ModShared;
+using System.Collections;
+using System.Collections.Generic;
+using UnityEngine;
 
-namespace MyAwesomeMod
+[BepInPlugin("example.weather", "Example Weather", "1.0.0")]
+public class ExampleWeatherPlugin : BaseUnityPlugin
 {
-    [BepInPlugin("com.example.mymod", "My Awesome MOD", "1.0.0")]
-    public class MyAwesomeModPlugin : BaseUnityPlugin
+    private bool _settingsRegistered;
+
+    private void Start()
     {
-        public static ManualLogSource Log;
+        StartCoroutine(RegisterSettingsWhenReady());
+    }
 
-        void Awake()
-        {
-            Log = Logger;
-            Log.LogInfo("MyAwesomeMod 已加载！");
-        }
-
-        void Start()
-        {
-            // 延迟一帧，确保设置管理器已初始化
-            StartCoroutine(InitializeSettings());
-        }
-
-        System.Collections.IEnumerator InitializeSettings()
-        {
+    private IEnumerator RegisterSettingsWhenReady()
+    {
+        while (ModSettingsManager.Instance?.IsInitialized != true)
             yield return null;
 
-            if (ModSettingsManager.Instance == null)
-            {
-                Log.LogError("ModSettingsManager 未找到！");
-                yield break;
-            }
+        if (_settingsRegistered) yield break;
 
-            if (!ModSettingsManager.Instance.IsInitialized)
-            {
-                Log.LogWarning("设置管理器未初始化，等待中...");
-                for (int i = 0; i < 100; i++)
-                {
-                    yield return new WaitForSeconds(0.1f);
-                    if (ModSettingsManager.Instance.IsInitialized) break;
-                }
-            }
+        RegisterSettings(ModSettingsManager.Instance);
+        _settingsRegistered = true;
+    }
 
-            AddMySettings();
-        }
+    private void RegisterSettings(ModSettingsManager manager)
+    {
+        manager.RegisterMod("Example Weather", "1.0.0");
 
-        void AddMySettings()
+        manager.RegisterTranslation("EX_ENABLE", "Enable Sync", "同期を有効化", "启用同步");
+        manager.RegisterTranslation("EX_PROVIDER", "Provider", "プロバイダー", "天气源");
+        manager.RegisterTranslation("EX_OPENMETEO", "Open-Meteo", "Open-Meteo", "Open-Meteo");
+        manager.RegisterTranslation("EX_SENIVERSE", "Seniverse", "心知天气", "心知天气");
+        manager.RegisterTranslation("EX_LATITUDE", "Latitude", "緯度", "纬度");
+        manager.RegisterTranslation("EX_CITY", "City", "都市", "城市");
+
+        manager.AddToggle("EX_ENABLE", true, enabled =>
         {
-            var manager = ModSettingsManager.Instance;
-            var content = manager.ModContentParent;
+            Logger.LogInfo($"Sync enabled: {enabled}");
+        });
 
-            // 添加开关：启用/禁用 MOD
-            manager.AddToggle(
-                content,
-                "启用我的MOD功能",
-                true,
-                (enabled) =>
-                {
-                    Debug.Log($"MyAwesomeMod 已{(enabled ? "启用" : "禁用")}");
-                }
-            );
+        manager.AddDropdown(
+            "EX_PROVIDER",
+            new List<string> { "EX_OPENMETEO", "EX_SENIVERSE" },
+            0,
+            index => Logger.LogInfo($"Provider index: {index}"));
 
-            // 添加下拉菜单：选择模式
-            manager.AddDropdown(
-                content,
-                "运行模式",
-                new System.Collections.Generic.List<string> { "性能优先", "平衡", "质量优先" },
-                1,
-                (index) =>
-                {
-                    string[] modes = { "Performance", "Balanced", "Quality" };
-                    SetMode(modes[index]);
-                }
-            );
-        }
+        manager.AddInputField(
+            "EX_LATITUDE",
+            "35.6812",
+            value => Logger.LogInfo($"Latitude: {value}"),
+            VisibleWhen.DropdownOption("EX_PROVIDER", "EX_OPENMETEO"));
 
-        void SetMode(string mode)
-        {
-            Log.LogInfo($"切换到模式: {mode}");
-        }
+        manager.AddInputField(
+            "EX_CITY",
+            "Tokyo",
+            value => Logger.LogInfo($"City: {value}"),
+            VisibleWhen.DropdownOption("EX_PROVIDER", "EX_SENIVERSE"));
     }
 }
 ```
 
-### 示例 2: 复杂的多层级设置
+## 最佳实践
 
-```csharp
-void AddMySettings()
-{
-    var manager = ModSettingsManager.Instance;
-    var content = manager.ModContentParent;
+- 使用带 MOD 前缀的 key，例如 `WEATHER_PROVIDER`，避免和其他 MOD 冲突。
+- `RegisterTranslation()` 放在对应 `Add*()` 之前。
+- 保存用户配置时，优先使用 BepInEx `ConfigEntry`。
+- 默认值应来自当前配置，而不是硬编码。
+- 不要重复注册；用 `_settingsRegistered` 之类的标记保护。
+- 不要手动调用或依赖内部 UI 容器，公开 API 没有 parent 参数。
+- 条件目标 key 在同一 MOD 内保持唯一。
+- 不要依赖条件链；需要复杂联动时先拆成单层控制。
 
-    // 第一组：基础设置
-    manager.AddToggle(content, "启用音效", true, OnSoundToggled);
-    manager.AddDropdown(content, "音量级别", 
-        new List<string> { "10%", "25%", "50%", "75%", "100%" }, 
-        4, OnVolumeChanged);
+## 常见问题
 
-    // 第二组：图形设置
-    manager.AddToggle(content, "启用阴影", true, OnShadowToggled);
-    manager.AddDropdown(content, "光源质量", 
-        new List<string> { "低", "中", "高" }, 
-        1, OnLightQualityChanged);
+### 为什么找不到 `ModContentParent`？
 
-    // 第三组：实验性功能
-    manager.AddToggle(content, "[实验] 新渲染器", false, OnNewRendererToggled);
-}
+当前版本不再暴露 `ModContentParent`。旧文档里的 parent 参数已经过时。外部 MOD 只需要调用无 parent 参数的 `AddToggle`、`AddDropdown`、`AddInputField`。
 
-void OnSoundToggled(bool value) => Debug.Log($"音效: {value}");
-void OnVolumeChanged(int index) => Debug.Log($"音量: {index}");
-void OnShadowToggled(bool value) => Debug.Log($"阴影: {value}");
-void OnLightQualityChanged(int index) => Debug.Log($"光源质量: {index}");
-void OnNewRendererToggled(bool value) => Debug.Log($"新渲染器: {value}");
-```
+### 设置项为什么重复出现？
 
----
+通常是重复注册了。确认你的初始化逻辑只执行一次。
 
-## ✨ 最佳实践
+### 条件项为什么没有隐藏？
 
-### 1. 正确处理初始化时序
-```csharp
-// ❌ 不要这样做（太早初始化）
-void Awake()
-{
-    AddSettings(); // ModSettingsManager 可能还没初始化
-}
+检查三件事：
 
-// ✅ 应该这样做（使用 Coroutine 延迟）
-void Start()
-{
-    StartCoroutine(WaitAndInitialize());
-}
+1. `TargetKey` 是否和控制项的 `labelOrKey` 完全一致。
+2. 下拉框选项如果使用翻译 key，`DropdownOption` 也要传同一个 key。
+3. 控制项和被控制项是否在同一个 `RegisterMod()` 分组内。
 
-System.Collections.IEnumerator WaitAndInitialize()
-{
-    yield return null; // 等待一帧
-    if (ModSettingsManager.Instance?.IsInitialized == true)
-    {
-        AddSettings();
-    }
-}
-```
+### iGPU Savior 未安装时怎么办？
 
-### 2. 保存和加载设置
-```csharp
-void AddMySettings()
-{
-    var manager = ModSettingsManager.Instance;
-    var content = manager.ModContentParent;
+如果直接引用 DLL，BepInEx 会要求依赖存在。若想做可选依赖，需要改用反射调用，并在找不到 `ModShared.ModSettingsManager` 时跳过设置页接入。
 
-    // 从配置文件读取保存的值
-    bool savedValue = LoadSetting("MyFeature", true);
+## 调试建议
 
-    manager.AddToggle(
-        content,
-        "我的功能",
-        savedValue,
-        (newValue) =>
-        {
-            SaveSetting("MyFeature", newValue);
-            ApplyFeature(newValue);
-        }
-    );
-}
-
-void SaveSetting(string key, object value)
-{
-    // 使用 BepInEx Config 或你自己的保存系统
-    PlayerPrefs.SetString(key, value.ToString());
-    PlayerPrefs.Save();
-}
-
-object LoadSetting(string key, object defaultValue)
-{
-    return PlayerPrefs.GetString(key, defaultValue.ToString());
-}
-```
-
-### 3. 处理设置变化的副作用
-```csharp
-manager.AddDropdown(
-    content,
-    "渲染分辨率",
-    new List<string> { "1280x720", "1600x900", "1920x1080" },
-    2,
-    (index) =>
-    {
-        string[] resolutions = { "1280x720", "1600x900", "1920x1080" };
-        ApplyResolution(resolutions[index]);
-        
-        // 重新初始化系统
-        ReinitializeGraphics();
-    }
-);
-```
-
-### 4. 使用清晰的标签名称
-```csharp
-// ❌ 不清楚
-manager.AddToggle(content, "启用 X", true, OnToggle);
-
-// ✅ 清晰且简洁
-manager.AddToggle(content, "启用实时阴影计算", true, OnToggle);
-manager.AddToggle(content, "启用去焦散景深效果", true, OnToggle);
-```
-
-### 5. 分组相关的设置
-```csharp
-// 创建一个占位符（空的行）作为分隔符
-var spacer = new GameObject("Spacer");
-spacer.transform.SetParent(content.transform);
-spacer.AddComponent<LayoutElement>().preferredHeight = 20;
-
-// 然后添加相关的设置组
-manager.AddToggle(content, "音效 - 启用", true, OnAudioToggled);
-manager.AddDropdown(content, "音效 - 质量", qualities, 1, OnAudioQualityChanged);
-```
-
----
-
-## ❓ 常见问题
-
-### Q1: 如果 ModSettingsManager 未初始化怎么办？
-
-**A**: iGPU Savior MOD 必须被加载。确保：
-1. iGPU Savior MOD 已正确安装在 BepInEx 插件目录中
-2. 你的 MOD 的依赖项列表中包含它
-3. 你的 MOD 加载顺序在 iGPU Savior 之后
-
-```xml
-<!-- 在 BepInEx.cfg 中设置加载优先级 -->
-[Chainloader]
-DLL Search Pattern = *.dll
-```
-
-### Q2: 可以添加其他类型的控件吗（例如滑块、输入框）？
-
-**A**: 当前 API 提供了 `AddToggle()` 和 `AddDropdown()`。如果需要其他控件类型，请：
-
-1. 提交 Issue 或 PR 到主项目
-2. 暂时自己创建自定义 UI 元素（高级用法）
-3. 使用 `ModContentParent` 直接访问容器并添加自定义控件
-
-```csharp
-// 高级：自定义 UI
-var customUI = Instantiate(yourPrefab, modManager.ModContentParent.transform);
-```
-
-### Q3: 如何确保设置的显示顺序？
-
-**A**: 按照你想要的顺序调用 API 方法即可：
-
-```csharp
-// 将按此顺序显示
-manager.AddToggle(content, "设置 A", true, callback);
-manager.AddToggle(content, "设置 B", false, callback);
-manager.AddToggle(content, "设置 C", true, callback);
-```
-
-### Q4: 如果多个 MOD 同时尝试添加设置会怎样？
-
-**A**: 完全安全！`ModSettingsManager` 的设计支持并发添加。所有 MOD 的设置都会按添加顺序显示在同一个面板中。
-
----
-
-## 🔧 故障排查
-
-### 问题 1: "ModSettingsManager 为 null"
-
-**症状**: 
-```
-NullReferenceException: Object reference not set to an instance of an object
-```
-
-**解决方案**:
-```csharp
-// 使用安全导航操作符
-if (ModSettingsManager.Instance?.IsInitialized == true)
-{
-    // 安全地添加设置
-}
-```
-
-### 问题 2: 设置没有显示
-
-**检查清单**:
-1. ✅ `ModSettingsManager.Instance.IsInitialized` 是否为 `true`？
-2. ✅ 你是否传递了正确的 `parent`（应该是 `ModContentParent`）？
-3. ✅ 在 Unity Inspector 中，MOD 标签页是否存在？
-4. ✅ 日志中是否有错误信息？
-
-**调试代码**:
-```csharp
-void DebugSettings()
-{
-    var manager = ModSettingsManager.Instance;
-    Debug.Log($"Manager 存在: {manager != null}");
-    Debug.Log($"已初始化: {manager?.IsInitialized}");
-    Debug.Log($"Content Parent: {manager?.ModContentParent}");
-    Debug.Log($"Scroll Rect: {manager?.ModScrollRect}");
-}
-```
-
-### 问题 3: UI 显示错位或重叠
-
-**原因**: 布局组件配置问题
-
-**解决方案**:
-- 确保 `ModContentParent` 有正确的 `LayoutGroup` 组件
-- 检查 `LayoutElement` 的 `preferredHeight` 设置
-- 强制重新构建布局：
-```csharp
-LayoutRebuilder.ForceRebuildLayoutImmediate(
-    modManager.ModContentParent.GetComponent<RectTransform>()
-);
-```
-
-### 问题 4: 回调没有被触发
-
-**检查**:
-```csharp
-// 确保回调函数签名正确
-manager.AddToggle(
-    content,
-    "测试",
-    true,
-    (value) =>  // ✅ 正确：参数是 bool
-    {
-        Debug.Log(value);
-    }
-);
-
-manager.AddDropdown(
-    content,
-    "测试",
-    new List<string> { "A", "B" },
-    0,
-    (index) =>  // ✅ 正确：参数是 int
-    {
-        Debug.Log(index);
-    }
-);
-```
-
----
-
-## 📞 获取帮助
-
-如果遇到问题：
-
-1. **检查日志** - 查看 BepInEx 的控制台输出
-2. **查阅本文档** - 使用 Ctrl+F 搜索关键词
-3. **参考示例** - 查看 `docs/` 目录中的完整示例代码
-4. **提交 Issue** - 在项目中报告 Bug 或请求功能
-5. **社区讨论** - 在论坛或 Discord 寻求帮助
-
----
-
-## 🎯 总结
-
-- ✅ 导入 `ModShared` 命名空间
-- ✅ 等待 `ModSettingsManager.Instance.IsInitialized == true`
-- ✅ 调用 `AddToggle()` / `AddDropdown()` 添加设置
-- ✅ 在回调中处理设置变化
-- ✅ 使用 PlayerPrefs 或你自己的系统保存设置
-
-祝你的 MOD 开发顺利！🚀
+- 查看 BepInEx 日志中 `[ModManager] Mod 注册` 和 `[ModSettings] 条件可见性错误`。
+- 先用一个 Toggle 和一个 Dropdown 做最小接入，确认显示后再加复杂逻辑。
+- 条件可见性建议先用 `DropdownIndex` 验证，再换成翻译 key 方案。

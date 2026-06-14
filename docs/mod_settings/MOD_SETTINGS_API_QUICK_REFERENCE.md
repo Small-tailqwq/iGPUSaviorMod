@@ -1,222 +1,118 @@
-# ⚡ MOD 设置 API 速查表
+# MOD 设置 API 速查表
 
-快速参考，用于开发者集成设置到游戏界面。
-
----
+用于外部 MOD 快速接入 iGPU Savior 的共享 `MOD` 设置标签页。
 
 ## 导入
 
 ```csharp
 using ModShared;
+using System.Collections.Generic;
 ```
 
----
-
-## 单例访问
+## 初始化
 
 ```csharp
-ModSettingsManager manager = ModSettingsManager.Instance;
-```
-
-| 属性 | 说明 |
-|------|------|
-| `IsInitialized` | 是否已初始化（`bool`） |
-| `ModContentParent` | 设置容器（`GameObject`） |
-| `ModTabButton` | MOD 标签按钮（`GameObject`） |
-| `ModScrollRect` | 滚动视图（`ScrollRect`） |
-
----
-
-## 方法
-
-### AddToggle - 添加开关
-
-```csharp
-manager.AddToggle(
-    GameObject parent,
-    string label,
-    bool defaultValue,
-    Action<bool> onValueChanged
-);
-```
-
-**示例**:
-```csharp
-manager.AddToggle(
-    manager.ModContentParent,
-    "启用后处理",
-    true,
-    (enabled) => Debug.Log(enabled)
-);
-```
-
----
-
-### AddDropdown - 添加下拉菜单
-
-```csharp
-manager.AddDropdown(
-    GameObject parent,
-    string label,
-    List<string> options,
-    int defaultIndex,
-    Action<int> onValueChanged
-);
-```
-
-**示例**:
-```csharp
-manager.AddDropdown(
-    manager.ModContentParent,
-    "质量等级",
-    new List<string> { "低", "中", "高" },
-    1,
-    (index) => Debug.Log($"选中: {index}")
-);
-```
-
----
-
-## 初始化模式
-
-### 推荐：使用 Coroutine
-
-```csharp
-void Start()
+var manager = ModSettingsManager.Instance;
+if (manager?.IsInitialized == true)
 {
-    StartCoroutine(InitSettings());
-}
-
-IEnumerator InitSettings()
-{
-    yield return null;
-    
-    var mgr = ModSettingsManager.Instance;
-    if (mgr?.IsInitialized == true)
-    {
-        mgr.AddToggle(mgr.ModContentParent, "测试", true, null);
-    }
+    manager.RegisterMod("My Mod", "1.0.0");
 }
 ```
 
-### 简单：使用 Update
+只注册一次。不要在每帧重复调用 `Add*()`。
+
+## 方法签名
 
 ```csharp
-bool initialized = false;
+void RegisterMod(string modName, string modVersion);
+void RegisterTranslation(string key, string en, string ja, string zh);
 
-void Update()
-{
-    if (!initialized && ModSettingsManager.Instance?.IsInitialized == true)
-    {
-        AddSettings();
-        initialized = true;
-    }
-}
+void AddToggle(string labelOrKey, bool defaultValue, Action<bool> onValueChanged);
+void AddToggle(string labelOrKey, bool defaultValue, Action<bool> onValueChanged,
+               VisibleWhenCondition visibleWhen);
 
-void AddSettings()
-{
-    var mgr = ModSettingsManager.Instance;
-    mgr.AddToggle(mgr.ModContentParent, "测试", true, null);
-}
+void AddDropdown(string labelOrKey, List<string> options, int defaultIndex,
+                 Action<int> onValueChanged);
+void AddDropdown(string labelOrKey, List<string> options, int defaultIndex,
+                 Action<int> onValueChanged, VisibleWhenCondition visibleWhen);
+
+void AddInputField(string labelOrKey, string defaultValue, Action<string> onValueChanged);
+void AddInputField(string labelOrKey, string defaultValue, Action<string> onValueChanged,
+                   VisibleWhenCondition visibleWhen);
 ```
 
----
-
-## 常用模式
-
-### 保存设置到 PlayerPrefs
-
-```csharp
-manager.AddToggle(
-    manager.ModContentParent,
-    "启用功能",
-    PlayerPrefs.GetInt("feature_enabled", 1) == 1,
-    (value) =>
-    {
-        PlayerPrefs.SetInt("feature_enabled", value ? 1 : 0);
-        PlayerPrefs.Save();
-    }
-);
-```
-
-### 链式调用多个设置
-
-```csharp
-var mgr = ModSettingsManager.Instance;
-var parent = mgr.ModContentParent;
-
-mgr.AddToggle(parent, "功能A", true, OnAChanged);
-mgr.AddToggle(parent, "功能B", false, OnBChanged);
-mgr.AddDropdown(parent, "模式", modes, 0, OnModeChanged);
-```
-
-### 设置变化时应用效果
-
-```csharp
-manager.AddDropdown(
-    manager.ModContentParent,
-    "分辨率",
-    new List<string> { "720p", "1080p", "4K" },
-    1,
-    (index) =>
-    {
-        ApplyResolution(index);
-        ReinitializeGraphics();
-    }
-);
-```
-
----
-
-## 安全检查清单
-
-- [ ] 导入 `using ModShared;`
-- [ ] 检查 `ModSettingsManager.Instance != null`
-- [ ] 检查 `IsInitialized == true`
-- [ ] 使用 `ModContentParent` 作为父容器
-- [ ] 回调函数签名正确（`bool` 或 `int`）
-- [ ] 测试初始化时序（使用 Coroutine 延迟）
-
----
-
-## 故障排查
-
-| 问题 | 解决方案 |
-|------|--------|
-| `null` 引用异常 | 使用安全导航: `Instance?.IsInitialized` |
-| 设置未显示 | 检查 `IsInitialized` 和 `parent` 参数 |
-| 回调不触发 | 检查回调签名：`bool` 或 `int` |
-| UI 错位 | 调用 `LayoutRebuilder.ForceRebuildLayoutImmediate()` |
-
----
+没有 parent/container 参数；UI 放置由 iGPU Savior 自动处理。
 
 ## 最小示例
 
 ```csharp
-using BepInEx;
-using ModShared;
-using UnityEngine;
-using System.Collections;
+private bool registered;
 
-[BepInPlugin("example.mod", "Example", "1.0")]
-public class ExampleMod : BaseUnityPlugin
+private void Update()
 {
-    void Start() => StartCoroutine(Setup());
+    if (registered) return;
 
-    IEnumerator Setup()
+    var manager = ModSettingsManager.Instance;
+    if (manager?.IsInitialized != true) return;
+
+    manager.RegisterMod("Example Mod", "1.0.0");
+    manager.RegisterTranslation("EXAMPLE_ENABLE", "Enable", "有効化", "启用");
+    manager.AddToggle("EXAMPLE_ENABLE", true, value =>
     {
-        yield return null;
-        
-        var mgr = ModSettingsManager.Instance;
-        if (mgr?.IsInitialized == true)
-        {
-            mgr.AddToggle(mgr.ModContentParent, "My Setting", true, 
-                (v) => Debug.Log($"Value: {v}"));
-        }
-    }
+        // Config.Enable.Value = value;
+    });
+
+    registered = true;
 }
 ```
 
----
+## 下拉框 + 条件输入框
 
-**更多详情请查看完整文档**: `MOD_SETTINGS_INTEGRATION_GUIDE.md`
+```csharp
+manager.RegisterTranslation("EX_PROVIDER", "Provider", "プロバイダー", "服务商");
+manager.RegisterTranslation("EX_A", "Provider A", "A", "服务商 A");
+manager.RegisterTranslation("EX_B", "Provider B", "B", "服务商 B");
+manager.RegisterTranslation("EX_A_TOKEN", "A Token", "A Token", "A Token");
+manager.RegisterTranslation("EX_B_TOKEN", "B Token", "B Token", "B Token");
+
+manager.AddDropdown("EX_PROVIDER", new List<string> { "EX_A", "EX_B" }, 0, index =>
+{
+    // Save provider index.
+});
+
+manager.AddInputField(
+    "EX_A_TOKEN",
+    "",
+    value => { /* Save A token. */ },
+    VisibleWhen.DropdownOption("EX_PROVIDER", "EX_A"));
+
+manager.AddInputField(
+    "EX_B_TOKEN",
+    "",
+    value => { /* Save B token. */ },
+    VisibleWhen.DropdownOption("EX_PROVIDER", "EX_B"));
+```
+
+## 条件可见性
+
+| 写法 | 含义 |
+| --- | --- |
+| `VisibleWhen.DropdownOption("KEY", "OPTION")` | `KEY` 下拉框当前选项等于 `OPTION` 时显示 |
+| `VisibleWhen.DropdownIndex("KEY", 1)` | `KEY` 下拉框当前索引为 `1` 时显示 |
+| `VisibleWhen.Toggle("KEY", true)` | `KEY` 开关为 `true` 时显示 |
+
+限制：
+
+- 控制项和被控制项必须在同一个 MOD 分组内。
+- 条件目标 key 在同一 MOD 内必须唯一。
+- 目标不存在、重复或类型不匹配时保持可见，并输出限流警告。
+- 暂不支持条件链。
+
+## 检查清单
+
+- [ ] 已引用 `iGPU Savior.dll`，并 `using ModShared;`
+- [ ] 等到 `Instance?.IsInitialized == true`
+- [ ] 先 `RegisterMod()`，再 `RegisterTranslation()` 和 `Add*()`
+- [ ] 每个设置 key 在同一 MOD 内唯一
+- [ ] 下拉框选项如果用翻译 key，条件里也使用同一个 key
+- [ ] 只注册一次，避免重复 UI 行
