@@ -16,7 +16,7 @@ namespace ModShared
         public bool ToggleValue;
         public int DropdownIndex;
         public IReadOnlyList<string> DropdownOptions;
-        public string InputValue;
+        public string InputValue { get; set; }
     }
 
     internal static class VisibleWhenEvaluator

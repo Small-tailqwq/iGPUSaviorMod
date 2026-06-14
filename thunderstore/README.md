@@ -130,7 +130,12 @@ AutoHideGuiInPiP = false
 
 详细更新日志请查看 [GitHub 版本历史](https://github.com/Small-tailqwq/iGPUSaviorMod/releases)
 
-### v1.9.0（最新版本）- 三级渲染模式与设置面板架构重构
+### v1.9.1（最新版本）- MOD 设置条件可见性 API
+- 🔌 **条件可见性 API**：`ModSettingsManager` 新增带 `visibleWhen` 参数的 `AddToggle` / `AddDropdown` / `AddInputField` 重载，第三方 MOD 可用 `VisibleWhen.DropdownOption`、`VisibleWhen.DropdownIndex`、`VisibleWhen.Toggle` 声明配置项联动显隐。
+- 🎛️ **实时依赖刷新**：开关和下拉框变更后会立即刷新同一 MOD 内依赖项的显示状态，并在隐藏下拉框前安全关闭展开层，减少设置页布局错乱。
+- 🧪 **稳定性与测试**：补充条件工厂、求值器与边界场景测试；目标缺失、重复、类型不匹配等配置错误采用 fail-open 策略并限流警告，避免第三方接入失误导致设置项消失。
+
+### v1.9.0 - 三级渲染模式与设置面板架构重构
 - 🥔 **三级渲染模式**：正常 / 土豆(F2) / 后台(失焦自动)，三级独立保存/恢复渲染参数
   - 后台省电优化：窗口失焦自动限帧 10fps + 渲染分辨率 0.1 + 关闭阴影和垂直同步
   - PiP 豁免：小窗期间跳过后台优化，退出后按焦点状态恢复
@@ -189,4 +194,3 @@ AutoHideGuiInPiP = false
 ---
 
 **免责声明**：本插件仅供学习交流使用，请勿用于商业用途。使用本插件产生的任何问题与作者无关。
-
