@@ -539,6 +539,33 @@ namespace PotatoOptimization.UI
         PotatoPlugin.Log.LogError($"Failed to configure PulldownListUI: {e}");
       }
     }
+
+    public static bool TryClosePulldown(GameObject pulldownClone)
+    {
+      if (pulldownClone == null) return false;
+
+      try
+      {
+        Type pulldownType = GetPulldownUIType();
+        if (pulldownType == null) return false;
+
+        var pulldownUI = pulldownClone.GetComponent(pulldownType)
+            ?? pulldownClone.GetComponentInChildren(pulldownType, true);
+        if (pulldownUI == null) return false;
+
+        var closeMethod = pulldownType.GetMethod("ClosePullDown",
+            BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
+        if (closeMethod == null) return false;
+
+        closeMethod.Invoke(pulldownUI, new object[] { false });
+        return true;
+      }
+      catch (Exception e)
+      {
+        PotatoOptimization.Core.PotatoPlugin.Log.LogWarning($"[ModPulldownCloner] TryClosePulldown failed: {e.Message}");
+        return false;
+      }
+    }
   }
 
   /// <summary>

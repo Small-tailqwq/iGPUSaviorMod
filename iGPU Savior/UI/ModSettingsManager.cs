@@ -1,6 +1,7 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Linq;
 using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
@@ -15,9 +16,28 @@ namespace ModShared
     // === 兼容性修复：加回 IsInitialized，让 EnvSync 能检测到 ===
     public bool IsInitialized { get; private set; } = false;
 
-    private abstract class SettingItemDef { public string Label; }
-    private class ToggleDef : SettingItemDef { public bool DefaultValue; public Action<bool> OnValueChanged; }
-    private class DropdownDef : SettingItemDef { public List<string> Options; public int DefaultIndex; public Action<int> OnValueChanged; }
+    private abstract class SettingItemDef
+    {
+      public string Label;
+      public string Key => Label;
+      public ModData Owner;
+      public VisibleWhenCondition Condition;
+    }
+
+    private class ToggleDef : SettingItemDef
+    {
+      public bool DefaultValue;
+      public bool CurrentValue;
+      public Action<bool> OnValueChanged;
+    }
+
+    private class DropdownDef : SettingItemDef
+    {
+      public List<string> Options;
+      public int DefaultIndex;
+      public int CurrentIndex;
+      public Action<int> OnValueChanged;
+    }
 
     private class InputFieldDef : SettingItemDef
     {
@@ -38,6 +58,10 @@ namespace ModShared
     private Transform _contentParent;
     private Transform _settingUIRoot;
     private bool _isBuildingUI = false;
+
+    private readonly Dictionary<SettingItemDef, GameObject> _itemUIs =
+      new Dictionary<SettingItemDef, GameObject>();
+    private readonly HashSet<string> _visibilityWarnings = new HashSet<string>();
 
     void Awake()
     {
@@ -78,38 +102,72 @@ namespace ModShared
     }
 
     // === 兼容性修复：处理 EnvSync 这种未调用 RegisterMod 直接 Add 的情况 ===
-    private void EnsureCurrentMod()
+    private ModData EnsureCurrentMod()
     {
       if (_currentRegisteringMod == null)
       {
         RegisterMod("General Settings", ""); // 自动归入通用设置
       }
+      return _currentRegisteringMod;
     }
 
     public void AddToggle(string labelOrKey, bool defaultValue, Action<bool> onValueChanged)
+      => AddToggle(labelOrKey, defaultValue, onValueChanged, null);
+
+    public void AddToggle(string labelOrKey, bool defaultValue, Action<bool> onValueChanged,
+                          VisibleWhenCondition visibleWhen)
     {
-      EnsureCurrentMod();
-      _currentRegisteringMod.Items.Add(new ToggleDef
-      { Label = labelOrKey, DefaultValue = defaultValue, OnValueChanged = onValueChanged });
+      var owner = EnsureCurrentMod();
+      var toggle = new ToggleDef
+      {
+        Label = labelOrKey,
+        Owner = owner,
+        DefaultValue = defaultValue,
+        CurrentValue = defaultValue,
+        OnValueChanged = onValueChanged,
+        Condition = visibleWhen
+      };
+      owner.Items.Add(toggle);
     }
 
-    public void AddDropdown(string labelOrKey, List<string> options, int defaultIndex, Action<int> onValueChanged)
+    public void AddDropdown(string labelOrKey, List<string> options, int defaultIndex,
+                            Action<int> onValueChanged)
+      => AddDropdown(labelOrKey, options, defaultIndex, onValueChanged, null);
+
+    public void AddDropdown(string labelOrKey, List<string> options, int defaultIndex,
+                            Action<int> onValueChanged,
+                            VisibleWhenCondition visibleWhen)
     {
-      EnsureCurrentMod();
-      _currentRegisteringMod.Items.Add(new DropdownDef
-      { Label = labelOrKey, Options = options, DefaultIndex = defaultIndex, OnValueChanged = onValueChanged });
+      var owner = EnsureCurrentMod();
+      var dropdown = new DropdownDef
+      {
+        Label = labelOrKey,
+        Owner = owner,
+        Options = options ?? new List<string>(),
+        DefaultIndex = defaultIndex,
+        CurrentIndex = defaultIndex,
+        OnValueChanged = onValueChanged,
+        Condition = visibleWhen
+      };
+      owner.Items.Add(dropdown);
     }
 
     public void AddInputField(string labelText, string defaultValue, Action<string> onValueChanged)
-    {
-      EnsureCurrentMod();  // ← 先确保有当前 Mod
+      => AddInputField(labelText, defaultValue, onValueChanged, null);
 
-      _currentRegisteringMod.Items.Add(new InputFieldDef
+    public void AddInputField(string labelText, string defaultValue, Action<string> onValueChanged,
+                              VisibleWhenCondition visibleWhen)
+    {
+      var owner = EnsureCurrentMod();
+      var input = new InputFieldDef
       {
         Label = labelText,
+        Owner = owner,
         DefaultValue = defaultValue,
-        OnValueChanged = onValueChanged
-      });
+        OnValueChanged = onValueChanged,
+        Condition = visibleWhen
+      };
+      owner.Items.Add(input);
     }
 
     public void RebuildUI(Transform contentParent, Transform settingUIRoot)
@@ -123,6 +181,7 @@ namespace ModShared
     private IEnumerator BuildSequence()
     {
       _isBuildingUI = true;
+      _itemUIs.Clear();
       foreach (Transform child in _contentParent) Destroy(child.gameObject);
       yield return null;
 
@@ -135,51 +194,60 @@ namespace ModShared
 
         foreach (var item in mod.Items)
         {
+          GameObject row = null;
           if (item is ToggleDef toggle)
           {
-            GameObject obj = ModToggleCloner.CreateToggle(_settingUIRoot, toggle.Label, toggle.DefaultValue, toggle.OnValueChanged);
-            if (obj != null)
+            Action<bool> wrapped = WrapToggleCallback(toggle);
+            row = ModToggleCloner.CreateToggle(_settingUIRoot, toggle.Label, toggle.DefaultValue, wrapped);
+            if (row != null)
             {
-              obj.transform.SetParent(_contentParent, false);
-              EnforceLayout(obj);
-              obj.SetActive(true);
+              row.transform.SetParent(_contentParent, false);
+              EnforceLayout(row);
+              row.SetActive(true);
             }
           }
           else if (item is DropdownDef dropdown)
           {
-            yield return CreateDropdownSequence(dropdown);
+            yield return CreateDropdownSequence(dropdown, (created) =>
+            {
+              _itemUIs[dropdown] = created;
+            });
           }
           else if (item is InputFieldDef inputDef)
           {
-            // 🆕 关键修改：从 _settingUIRoot 查找原版游戏的模板位置
             Transform graphicsContent = _settingUIRoot.Find("Graphics/ScrollView/Viewport/Content");
-
             if (graphicsContent == null)
             {
               PotatoOptimization.Core.PotatoPlugin.Log.LogError("[Manager] Graphics Content not found!");
               continue;
             }
 
-            GameObject obj = ModInputFieldCloner.CreateInputField(
-                graphicsContent,  // ← 传入 Graphics 的 Content，里面有模板
+            row = ModInputFieldCloner.CreateInputField(
+                graphicsContent,
                 inputDef.Label,
                 inputDef.DefaultValue,
-                inputDef.OnValueChanged
-            );
+                inputDef.OnValueChanged);
 
-            if (obj != null)
+            if (row != null)
             {
-              obj.transform.SetParent(_contentParent, false);
-              EnforceLayout(obj);
-              obj.SetActive(true);
+              row.transform.SetParent(_contentParent, false);
+              EnforceLayout(row);
+              row.SetActive(true);
             }
             else
             {
               PotatoOptimization.Core.PotatoPlugin.Log.LogWarning($"[Manager] Failed to create input field: {inputDef.Label}");
             }
+          }
 
+          if (!(item is DropdownDef) && row != null)
+          {
+            _itemUIs[item] = row;
           }
         }
+
+        yield return null;
+        ApplyInitialVisibilityForMod(mod);
         CreateDivider();
       }
       Canvas.ForceUpdateCanvases();
@@ -198,7 +266,7 @@ namespace ModShared
       _isBuildingUI = false;
     }
 
-    private IEnumerator CreateDropdownSequence(DropdownDef def)
+    private IEnumerator CreateDropdownSequence(DropdownDef def, Action<GameObject> onRootCreated)
     {
       GameObject pulldownClone = ModPulldownCloner.CloneAndClearPulldown(_settingUIRoot);
       if (pulldownClone == null) yield break;
@@ -224,11 +292,12 @@ namespace ModShared
         }
       }
 
+      Action<int> wrapped = WrapDropdownCallback(def);
       GameObject buttonTemplate = ModPulldownCloner.GetSelectButtonTemplate(_settingUIRoot);
       for (int i = 0; i < def.Options.Count; i++)
       {
         int idx = i;
-        ModPulldownCloner.AddOption(pulldownClone, buttonTemplate, def.Options[i], () => def.OnValueChanged?.Invoke(idx));
+        ModPulldownCloner.AddOption(pulldownClone, buttonTemplate, def.Options[i], () => wrapped?.Invoke(idx));
       }
 
       if (def.DefaultIndex >= 0 && def.DefaultIndex < def.Options.Count)
@@ -239,6 +308,8 @@ namespace ModShared
 
       EnforceLayout(pulldownClone); // === 强制对齐 ===
       pulldownClone.SetActive(true);
+
+      onRootCreated?.Invoke(pulldownClone);
 
       Transform content = pulldownClone.transform.Find("PulldownList/Pulldown/CurrentSelectText (TMP)/Content");
       LayoutRebuilder.ForceRebuildLayoutImmediate(content as RectTransform);
@@ -346,6 +417,135 @@ namespace ModShared
             return;
           }
         }
+      }
+    }
+
+    private Action<bool> WrapToggleCallback(ToggleDef toggle)
+    {
+      Action<bool> original = toggle.OnValueChanged;
+      return (value) =>
+      {
+        toggle.CurrentValue = value;
+        try
+        {
+          RefreshDependents(toggle.Owner, toggle);
+        }
+        catch (Exception e)
+        {
+          PotatoOptimization.Core.PotatoPlugin.Log.LogWarning($"[ModSettings] 刷新依赖失败: {e.Message}");
+        }
+        original?.Invoke(value);
+      };
+    }
+
+    private Action<int> WrapDropdownCallback(DropdownDef dropdown)
+    {
+      Action<int> original = dropdown.OnValueChanged;
+      return (index) =>
+      {
+        dropdown.CurrentIndex = index;
+        try
+        {
+          RefreshDependents(dropdown.Owner, dropdown);
+        }
+        catch (Exception e)
+        {
+          PotatoOptimization.Core.PotatoPlugin.Log.LogWarning($"[ModSettings] 刷新依赖失败: {e.Message}");
+        }
+        original?.Invoke(index);
+      };
+    }
+
+    private void ApplyInitialVisibilityForMod(ModData mod)
+    {
+      foreach (var item in mod.Items)
+      {
+        if (item.Condition == null) continue;
+        bool visible = EvaluateVisibility(mod, item, out _);
+        ApplyVisibility(item, visible);
+      }
+    }
+
+    private void RefreshDependents(ModData owner, SettingItemDef controller)
+    {
+      var dependents = owner.Items.Where(i => i.Condition != null && i.Condition.TargetKey == controller.Key);
+      foreach (var dependent in dependents)
+      {
+        bool visible = EvaluateVisibility(owner, dependent, out _);
+        ApplyVisibility(dependent, visible);
+      }
+    }
+
+    private bool EvaluateVisibility(ModData owner, SettingItemDef dependent, out string failureReason)
+    {
+      failureReason = null;
+      if (dependent.Condition == null)
+        return true;
+
+      var targets = owner.Items.Where(i => i.Key == dependent.Condition.TargetKey).ToList();
+      if (targets.Count != 1)
+      {
+        failureReason = targets.Count == 0
+            ? $"Condition target '{dependent.Condition.TargetKey}' not found"
+            : $"Condition target '{dependent.Condition.TargetKey}' is ambiguous ({targets.Count} matches)";
+        LogVisibilityWarningOnce(dependent, failureReason);
+        return true;
+      }
+
+      var controller = targets[0];
+      var snapshot = ToSnapshot(controller);
+      bool result = VisibleWhenEvaluator.Evaluate(dependent.Condition, snapshot, out failureReason);
+      if (!string.IsNullOrEmpty(failureReason))
+      {
+        LogVisibilityWarningOnce(dependent, failureReason);
+      }
+      return result;
+    }
+
+    private SettingValueSnapshot ToSnapshot(SettingItemDef item)
+    {
+      if (item is ToggleDef toggle)
+      {
+        return new SettingValueSnapshot
+        {
+          Kind = SettingValueKind.Toggle,
+          ToggleValue = toggle.CurrentValue
+        };
+      }
+
+      if (item is DropdownDef dropdown)
+      {
+        return new SettingValueSnapshot
+        {
+          Kind = SettingValueKind.Dropdown,
+          DropdownIndex = dropdown.CurrentIndex,
+          DropdownOptions = dropdown.Options
+        };
+      }
+
+      return null;
+    }
+
+    private void ApplyVisibility(SettingItemDef item, bool visible)
+    {
+      if (!_itemUIs.TryGetValue(item, out GameObject row) || row == null) return;
+      if (row.activeSelf == visible) return;
+
+      if (!visible)
+      {
+        ModPulldownCloner.TryClosePulldown(row);
+      }
+
+      row.SetActive(visible);
+      LayoutRebuilder.ForceRebuildLayoutImmediate(_contentParent as RectTransform);
+    }
+
+    private void LogVisibilityWarningOnce(SettingItemDef item, string reason)
+    {
+      string key = $"{item.Owner?.Name}:{item.Key}:{reason}";
+      if (_visibilityWarnings.Add(key))
+      {
+        PotatoOptimization.Core.PotatoPlugin.Log.LogWarning($"[ModSettings] 条件可见性错误（{key}）：{reason}，该项将保持可见。");
       }
     }
   }
