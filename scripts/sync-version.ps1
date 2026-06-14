@@ -96,7 +96,6 @@ $versionChecks = @(
   @{ Path = 'iGPU Savior/Core/Constants.cs'; Pattern = 'public const string PluginVersion = "([^"]+)";'; Label = 'Constants.PluginVersion' },
   @{ Path = 'thunderstore/manifest.json'; Pattern = '"version_number"\s*:\s*"([^"]+)"'; Label = 'manifest.version_number' },
   @{ Path = 'CHANGELOG.md'; Pattern = '(?m)^### v(\d+\.\d+\.\d+)（最新版本）- '; Label = 'CHANGELOG latest heading' },
-  @{ Path = 'README.md'; Pattern = '(?m)^### v(\d+\.\d+\.\d+)（最新版本）- '; Label = 'README latest heading' },
   @{ Path = 'thunderstore/README.md'; Pattern = '(?m)^### v(\d+\.\d+\.\d+)（最新版本）- '; Label = 'thunderstore README latest heading' }
 )
 
@@ -129,11 +128,6 @@ $headingReplacer = {
 Update-TargetVersion -RelativePath 'CHANGELOG.md' `
   -Pattern '(?m)^### v(\d+\.\d+\.\d+)（最新版本）- (.+)$' `
   -Label 'CHANGELOG latest heading' `
-  -Replacer $headingReplacer
-
-Update-TargetVersion -RelativePath 'README.md' `
-  -Pattern '(?m)^### v(\d+\.\d+\.\d+)（最新版本）- (.+)$' `
-  -Label 'README latest heading' `
   -Replacer $headingReplacer
 
 Update-TargetVersion -RelativePath 'thunderstore/README.md' `

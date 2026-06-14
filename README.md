@@ -4,7 +4,9 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![.NET Framework 4.7.2](https://img.shields.io/badge/.NET%20Framework-4.7.2-blue.svg)](https://dotnet.microsoft.com/download/dotnet-framework/net472)
 [![BepInEx](https://img.shields.io/badge/BepInEx-Plugin-green.svg)](https://github.com/BepInEx/BepInEx)
-[![opencode](https://github.com/anomalyco/opencode/raw/dev/packages/console/app/src/asset/logo-ornate-dark.svg)](https://github.com/anomalyco/opencode)
+<a href="https://github.com/anomalyco/opencode"><img src="https://github.com/anomalyco/opencode/raw/dev/packages/console/app/src/asset/logo-ornate-dark.svg" height="20" alt="opencode"></a>
+<a href="https://opencode.ai/go?ref=X83D5WQ2NS"><img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='54' height='30' viewBox='0 0 54 30'%3E%3Cpath d='M24 30H0V0H24V6H6V24H18V18H12V12H24V30Z' fill='currentColor'/%3E%3Cpath d='M12 18H18V24H6V12H12V18Z' fill='currentColor' fill-opacity='0.2'/%3E%3Cpath d='M48 12V24H36V12H48Z' fill='currentColor' fill-opacity='0.2'/%3E%3Cpath d='M54 30H30V0H54V30ZM36 24H48V6H36V24Z' fill='currentColor'/%3E%3C/svg%3E" height="20" alt="OpenCode Go"></a>
+> 使用 Opencode 等工具进行构建，由 Opencode GO 提供模型支持
 
 
 一个用于游戏 《*放松时光：与你共享Lo-Fi故事*》 的性能和体验优化 BepInEx 插件。可以降低资源占用，并提供镜像、小窗、竖屏等增强体验模式。
@@ -24,22 +26,8 @@
 ---
 
 关联我写的第一个同步 mod：[Chill Env Sync](https://github.com/Small-tailqwq/RealTimeWeatherMod)
+> 搭配此 MOD，可以实现基于现实日出日落与天气的同步功能。
 
-## 📋 目录
-
-- [快速演示](#快速演示)
-- [主要功能](#-主要功能)
-- [支持的环境类型](#-支持的环境类型)
-- [安装方法](#-安装方法)
-- [配置说明](#-配置说明)
-- [使用方法](#-使用方法)
-- [技术细节](#-技术细节)
-- [版本历史](#-版本历史)
-- [已知问题](#-已知问题)
-- [贡献](#-贡献)
-- [许可证](#-许可证)
-- [作者](#-作者)
-- [致谢](#-致谢)
 
 ## 快速演示
 
@@ -93,6 +81,15 @@
 - `F5` - 切换竖屏优化模式（增大竖屏视角）
 	- 可在配置中设置启动时自动启用
 	- 支持在游戏内 MOD 设置中开关"竖优自启动"
+
+- 为 MOD 提供了设置 GUI 的注册功能
+  - 以本 mod 为前置 mod，其他 mod 可以自行接入配置项至原生设置彩蛋。本 mod 提供了开关、输入框、下拉选项等输入控件
+- 服装轮换功能
+  - 可通过配置文件关闭服装轮换功能
+  - 也可通过设置 GUI 许愿下次见面想看到的衣服
+- 笔记等内容的导出与删除二次确认
+  - 支持导出笔记为兼容性最佳的 txt 格式（win only）
+  - 支持笔记、代办的删除二次确认
 
 
 ## ⚠️ 本项目可能有
@@ -227,104 +224,14 @@ AutoHideGuiInPiP = false
 - **框架**：BepInEx 5.x
 - **目标框架**：.NET Framework 4.7.2
 - **使用技术/工具**：
-  - 反射（用于访问游戏内部系统）
+  - unity 相关的 mcp
   - 各种大语言模型
 
 ## 📝 版本历史
-> 注：版本号为 AI 自己写的，不关我的事
 
-### 发版版本号同步
-- 编辑仓库根目录 `version.json`。
-- 运行 `scripts/sync-version.ps1` 同步 `Constants.cs`、`thunderstore/manifest.json` 与文档版本标题。
-- 发版前可执行 `scripts/sync-version.ps1 -CheckOnly` 做一致性检查。
+完整更新日志请查看 [CHANGELOG.md](CHANGELOG.md) 或 [Git 提交记录](https://github.com/Small-tailqwq/iGPUSaviorMod/commits/master)。
 
-### v1.9.1（最新版本）- MOD 设置条件可见性 API
-
-- 🔌 **条件可见性 API**：`ModSettingsManager` 新增带 `visibleWhen` 参数的 `AddToggle` / `AddDropdown` / `AddInputField` 重载，第三方 MOD 可用 `VisibleWhen.DropdownOption`、`VisibleWhen.DropdownIndex`、`VisibleWhen.Toggle` 声明配置项联动显隐。
-- 🎛️ **实时依赖刷新**：开关和下拉框变更后会立即刷新同一 MOD 内依赖项的显示状态，并在隐藏下拉框前安全关闭展开层，减少设置页布局错乱。
-- 🧪 **稳定性与测试**：补充条件工厂、求值器与边界场景测试；目标缺失、重复、类型不匹配等配置错误采用 fail-open 策略并限流警告，避免第三方接入失误导致设置项消失。
-
-### v1.9.0 - 三级渲染模式与设置面板架构重构
-
-- 🥔 **三级渲染模式**：正常 / 土豆(F2) / 后台(失焦自动)，三级独立保存/恢复渲染参数
-  - 后台省电优化：窗口失焦自动限帧 10fps + 渲染分辨率 0.1 + 关闭阴影和垂直同步，获焦恢复
-  - PiP 豁免：小窗期间跳过后台优化，退出后按焦点状态恢复
-  - 土豆模式优先级最高，不受焦点切换影响
-- 🪟 **小窗模式增强**：记忆位置和窗口尺寸、窗口子类化重写、支持 DWM 边框颜色控制
-  - 退出小窗时自动恢复原始窗口位置
-  - 新增 `AutoHideGuiInPiP` 配置项，进入小窗自动隐藏游戏 GUI
-- 🎨 **MOD 设置面板重构**：从 Credits 切换到 General 模板，彻底解决布局偏移问题
-  - 引入共用样式系统 `ModSettingsStyle`，统一控件配置
-  - 下拉层新增智能排序层级过渡控制
-- 🐛 **缺陷修复**：服装悄悄话空值防护、日志级别统一降噪
-
-### v1.8.1 - 原版设置激活态修复与发版流程改进
-- 🐛 **设置界面修复**：修复安装 mod 后原版设置 ON/OFF 激活高亮丢失的问题。
-- ✅ **回归测试**：新增字段筛选回归测试，防止 `InteractableUI` 误匹配再次造成 UI 状态错乱。
-- 🧩 **版本管理统一**：新增 `version.json` + `scripts/sync-version.ps1`，后续发版只改一处版本号再同步。
-
-### v1.8.0 - 笔记导出与缺陷修复版
-- 📝 [noteworthy] **笔记多选导出**：支持多选笔记导出为 UTF-8 with BOM 的 `.txt` 文件。
-- 🗑️ **删除确认**：笔记删除操作增加确认弹窗，可在 MOD 设置中开关。
-- 🐛 **缺陷修复**：修复镜像模式 UI 按钮错误激活等问题。
-- 📚 **文档整顿**：重组文档目录，更新 MOD 对接指南。
-
-### v1.7.4 - UI 架构自适应修复与优化版
-- 🐛 **UI 布局崩溃修复**：为动态文字组件正确挂载字体资源上下文，彻底解决了因 `LayoutRebuilder` 空指针导致的所有选项重叠在一块的视觉 BUG。
-- 🎨 **无缝兼容原版界面**：弃用简单的坐标裁剪法，为设置顶部标签栏启用纯自适应弹性伸缩特性（Flex），官方再怎么增减标签页都不会超框或吃字。
-- ⚙️ **解散标签竞态死结**：以底层机制抛弃传统“字符串数组”枚举的方法重写了标签高亮和面板切换的判定系统；不管未来游戏升级新加入多少设置页面分支，都不会和 MOD 的开启状态错位重叠。
-- 🎛️ **设置控件样式统一**：将竖屏模式的改键测试控件平滑过渡至原生统一的下拉菜单形态，不影响现有本地快捷键的向下兼容性。
-
-### v1.7.3 - 多语言与小窗优化版
-- 🌍 **多语言系统重构**：
-  - ✨ **极简多语言支持**：内置了简体中文、繁体中文（回落到简中）、日文、英文的本地化支持。
-  - 🐛 **语言切换 Bug 修复**：修复了在游戏内切换语言时，“MOD 设置”标签变回 "Credits" 或者内容不更新的问题。
-  - 🔄 **动态刷新**：所有 MOD 设置项现已支持动态语言切换，无需重启游戏即可实时更新文本和字体。
-- 🔌 **第三方 MOD 对接升级**：
-  - 🛠️ **新增多语言 API**：`ModSettingsManager` 新增 `RegisterTranslation` 方法，允许第三方 MOD 注册自己的翻译 Key。
-  - ✅ **向后兼容**：旧版对接代码依然有效，但建议更新以支持多语言切换（详见文档或示例）。
-- 🪟 **小窗模式优化**：
-  - 💾 **记忆位置**：优化了 F3 小窗的位置记忆逻辑，修复了从全屏切回小窗时位置重置的问题。
-  - 🔐 **登录验证修复**：修复了 F3 切换时可能导致的登录窗口异常或状态丢失问题。
-
-### v1.7.2 - 竖屏优化优化版
-- 🐛 **重大 Bug 修复**：彻底解决竖屏优化自动启用时的相机位置错误问题
-  - 📍 **问题根源**：启动时延迟太短（0.5秒），导致保存了游戏初始化时的默认相机位置 `(0,1,-10)` 而非实际位置
-  - ⏱️ **解决方案**：采用与镜像模式相同的延迟机制，改为场景加载后 15 秒再启用，确保游戏完全初始化
-  - 💾 **参数保留机制**：Toggle 关闭时保留已保存的原始参数，重新启用时无需重新保存，避免在竖屏状态下误保存参数
-  - 🔄 **智能初始化**：首次启用时检查是否已有保存的参数，避免重复保存
-- ⚙️ **新增配置项**：
-  - GUI 设置中新增"竖优自启动"开关，可在游戏内直接调整
-  - 配置文件新增 `EnablePortraitMode` 选项（默认关闭，建议手动测试后再开启）
-- 📊 **改进日志**：优化竖屏优化相关的日志输出，方便问题追踪
-
-### v1.7.1
-- 添加了设置中直接调整 MOD 配置的接口，支持其他 MOD 接入  
-  - 目前接入的 MOD 有：[Chill Env Sync](https://github.com/Small-tailqwq/RealTimeWeatherMod)  
-- 添加了竖屏优化，支持在竖屏状态通过 F5 打开或关闭，开启时可以获得更大的视角  
-  - 不建议在竖屏工作时开启，因为竖屏工作是特写🥰  
-- 添加了小窗模式，支持通过 F3 打开或关闭，开启时强制置顶，可以通过组合键或者鼠标右键的形式进行移动  
-  - 未来可能会加入竖屏小窗功能，类似微信电话浮窗
-
-### v1.7.0
-- ✨ **镜像模式重大改进**：完全重写镜像实现，修复所有已知问题
-  - 🎨 **修复光照撕裂**：改用 RenderTexture + UV 翻转方案，不再破坏角色法线和蒙皮权重
-  - 🖱️ **智能输入映射**：鼠标点击自动适配镜像画面，点击 UI 和 3D 场景时坐标分别处理
-  - 🎧 **音频声道交换**：镜像模式下自动交换左右声道，视听完全一致
-  - 🖼️ **自动分辨率适配**：窗口大小变化时自动重建 RenderTexture，无蓝屏问题
-  - 🔧 **资源管理优化**：正确释放 RenderTexture/Canvas/Material，无内存泄漏
-- 🎯 **新增功能**：
-  - `F4` - 切换摄像机镜像模式（左右翻转画面）
-  - 配置项：`CfgEnableMirror` - 启动时是否自动启用镜像（默认关闭）
-- 🐛 **Bug 修复**：
-  - 修复镜像模式下点击事件穿透问题（UI 可正常点击）
-  - 修复窗口调整大小时画面变蓝的问题
-  - 修复鼠标输入无限递归导致的死锁问题
-
-### v1.6.0
-- 第一个发布版本，后续看看能不能优化一下土豆模式，不过游戏优化这块我还真不懂
-
-详细更新日志请查看 [Git 提交记录](https://github.com/Small-tailqwq/iGPUSaviorMod/commits/master)
+> 版本号由仓库根目录 `version.json` 管理，运行 `scripts/sync-version.ps1` 同步。
 
 ## 🐛 已知问题
 
