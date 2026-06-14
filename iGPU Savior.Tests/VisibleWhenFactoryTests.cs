@@ -24,13 +24,15 @@ namespace IGPUSavior.Tests
             Assert.Equal(2, typed.ExpectedIndex);
         }
 
-        [Fact]
-        public void Toggle_PreservesTargetAndExpectedValue()
+        [Theory]
+        [InlineData(true)]
+        [InlineData(false)]
+        public void Toggle_PreservesTargetAndExpectedValue(bool expectedValue)
         {
-            var cond = VisibleWhen.Toggle("EnableAdvanced", true);
+            var cond = VisibleWhen.Toggle("EnableAdvanced", expectedValue);
             Assert.Equal("EnableAdvanced", cond.TargetKey);
             var typed = Assert.IsType<ToggleCondition>(cond);
-            Assert.True(typed.ExpectedValue);
+            Assert.Equal(expectedValue, typed.ExpectedValue);
         }
 
         [Theory]
@@ -41,10 +43,32 @@ namespace IGPUSavior.Tests
             Assert.Throws<ArgumentException>(() => VisibleWhen.DropdownOption(targetKey, "OpenMeteo"));
         }
 
+        [Theory]
+        [InlineData(null)]
+        [InlineData("")]
+        public void DropdownIndex_RejectsEmptyTargetKey(string targetKey)
+        {
+            Assert.Throws<ArgumentException>(() => VisibleWhen.DropdownIndex(targetKey, 0));
+        }
+
+        [Theory]
+        [InlineData(null)]
+        [InlineData("")]
+        public void Toggle_RejectsEmptyTargetKey(string targetKey)
+        {
+            Assert.Throws<ArgumentException>(() => VisibleWhen.Toggle(targetKey, true));
+        }
+
         [Fact]
         public void DropdownOption_RejectsNullExpectedOption()
         {
             Assert.Throws<ArgumentNullException>(() => VisibleWhen.DropdownOption("Provider", null));
+        }
+
+        [Fact]
+        public void DropdownOption_RejectsEmptyExpectedOption()
+        {
+            Assert.Throws<ArgumentException>(() => VisibleWhen.DropdownOption("Provider", string.Empty));
         }
     }
 }
