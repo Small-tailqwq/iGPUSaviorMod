@@ -36,5 +36,7 @@
     <Compile Include="..\iGPU Savior\Patches\NoteExportHeaderLayout.cs" Link="NoteExportHeaderLayout.cs" />
     <Compile Include="VisibleWhenFactoryTests.cs" />
     <Compile Include="..\iGPU Savior\UI\VisibleWhen.cs" Link="VisibleWhen.cs" />
+    <Compile Include="VisibleWhenEvaluatorTests.cs" />
+    <Compile Include="..\iGPU Savior\UI\VisibleWhenEvaluator.cs" Link="VisibleWhenEvaluator.cs" />
   </ItemGroup>
 </Project>
