@@ -2,9 +2,11 @@
 
 ### v1.9.1（最新版本）- MOD 设置条件可见性 API
 
-- 🔌 **条件可见性 API**：`ModSettingsManager` 新增带 `visibleWhen` 参数的 `AddToggle` / `AddDropdown` / `AddInputField` 重载，第三方 MOD 可用 `VisibleWhen.DropdownOption`、`VisibleWhen.DropdownIndex`、`VisibleWhen.Toggle` 声明配置项联动显隐。
-- 🎛️ **实时依赖刷新**：开关和下拉框变更后会立即刷新同一 MOD 内依赖项的显示状态，并在隐藏下拉框前安全关闭展开层，减少设置页布局错乱。
-- 🧪 **稳定性与测试**：补充条件工厂、求值器与边界场景测试；目标缺失、重复、类型不匹配等配置错误采用 fail-open 策略并限流警告，避免第三方接入失误导致设置项消失。
+- ✨ **条件可见性 API**：第三方 MOD 可通过 `visibleWhen` 声明配置项联动显隐。
+- 🔄 **实时依赖刷新**：配置项变更后自动刷新依赖项显示状态。
+- ✅ **稳定性加固**：补充条件工厂、求值器与边界测试，配置错误 fail-open 限流警告。
+- 🐛 **缺陷修复**：修复设置界面输入框行距异常。
+- 📚 **文档更新**：完善 README、接入指南与版本同步脚本说明。
 
 ### v1.9.0 - 三级渲染模式与设置面板架构重构
 
