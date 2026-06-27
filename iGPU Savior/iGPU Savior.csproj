@@ -1,37 +1,18 @@
-<?xml version="1.0" encoding="utf-8"?>
-<Project ToolsVersion="15.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
-  <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')" />
-
+<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
-    <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
-    <ProjectGuid>{6A7F588E-DA7A-4976-AFED-31E2529C1039}</ProjectGuid>
-    <OutputType>Library</OutputType>
-    <AppDesignerFolder>Properties</AppDesignerFolder>
-    <RootNamespace>iGPU_Savior</RootNamespace>
+    <TargetFramework>net472</TargetFramework>
     <AssemblyName>iGPU Savior</AssemblyName>
-    <TargetFrameworkVersion>v4.7.2</TargetFrameworkVersion>
-    <FileAlignment>512</FileAlignment>
+    <RootNamespace>iGPU_Savior</RootNamespace>
+    <OutputType>Library</OutputType>
+    <LangVersion>latest</LangVersion>
+    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
+    <GenerateTargetFrameworkAttribute>false</GenerateTargetFrameworkAttribute>
     <Deterministic>true</Deterministic>
+    <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
   </PropertyGroup>
 
-  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
-    <DebugSymbols>true</DebugSymbols>
-    <DebugType>full</DebugType>
-    <Optimize>false</Optimize>
-    <OutputPath>bin\Debug\</OutputPath>
-    <DefineConstants>DEBUG;TRACE</DefineConstants>
-    <ErrorReport>prompt</ErrorReport>
-    <WarningLevel>4</WarningLevel>
-  </PropertyGroup>
-
-  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
-    <DebugType>pdbonly</DebugType>
+  <PropertyGroup Condition="'$(Configuration)' == 'Release'">
     <Optimize>true</Optimize>
-    <OutputPath>bin\Release\</OutputPath>
-    <DefineConstants>TRACE</DefineConstants>
-    <ErrorReport>prompt</ErrorReport>
-    <WarningLevel>4</WarningLevel>
   </PropertyGroup>
 
   <PropertyGroup>
@@ -39,126 +20,66 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <Reference Include="0Harmony">
+    <Reference Include="0Harmony" Private="false">
       <HintPath>$(GameDir)\BepInEx\core\0Harmony.dll</HintPath>
     </Reference>
-    <Reference Include="Assembly-CSharp">
+    <Reference Include="Assembly-CSharp" Publicize="true" Private="false">
       <HintPath>$(GameDir)\Chill With You_Data\Managed\Assembly-CSharp.dll</HintPath>
     </Reference>
-    <Reference Include="BepInEx">
+    <Reference Include="BepInEx" Private="false">
       <HintPath>$(GameDir)\BepInEx\core\BepInEx.dll</HintPath>
     </Reference>
-    <Reference Include="R3">
+    <Reference Include="R3" Private="false">
       <HintPath>$(GameDir)\Chill With You_Data\Managed\R3.dll</HintPath>
     </Reference>
-    <Reference Include="System" />
-    <Reference Include="System.Core" />
-    <Reference Include="System.Xml.Linq" />
-    <Reference Include="System.Data.DataSetExtensions" />
-    <Reference Include="Microsoft.CSharp" />
-    <Reference Include="System.Data" />
-    <Reference Include="System.Net.Http" />
-    <Reference Include="System.Xml" />
-    <Reference Include="Unity.TextMeshPro">
+    <Reference Include="Unity.TextMeshPro" Private="false">
       <HintPath>$(GameDir)\Chill With You_Data\Managed\Unity.TextMeshPro.dll</HintPath>
     </Reference>
-    <Reference Include="UnityEngine">
+    <Reference Include="UnityEngine" Private="false">
       <HintPath>$(GameDir)\Chill With You_Data\Managed\UnityEngine.dll</HintPath>
     </Reference>
-    <Reference Include="UnityEngine.AudioModule">
+    <Reference Include="UnityEngine.AudioModule" Private="false">
       <HintPath>$(GameDir)\Chill With You_Data\Managed\UnityEngine.AudioModule.dll</HintPath>
     </Reference>
-    <Reference Include="UnityEngine.CoreModule">
+    <Reference Include="UnityEngine.CoreModule" Private="false">
       <HintPath>$(GameDir)\Chill With You_Data\Managed\UnityEngine.CoreModule.dll</HintPath>
     </Reference>
-    <Reference Include="UnityEngine.IMGUIModule">
+    <Reference Include="UnityEngine.IMGUIModule" Private="false">
       <HintPath>$(GameDir)\Chill With You_Data\Managed\UnityEngine.IMGUIModule.dll</HintPath>
     </Reference>
-    <Reference Include="UnityEngine.InputLegacyModule">
+    <Reference Include="UnityEngine.InputLegacyModule" Private="false">
       <HintPath>$(GameDir)\Chill With You_Data\Managed\UnityEngine.InputLegacyModule.dll</HintPath>
     </Reference>
-    <Reference Include="UnityEngine.PhysicsModule">
+    <Reference Include="UnityEngine.PhysicsModule" Private="false">
       <HintPath>$(GameDir)\Chill With You_Data\Managed\UnityEngine.PhysicsModule.dll</HintPath>
     </Reference>
-    <Reference Include="UnityEngine.TextRenderingModule">
+    <Reference Include="UnityEngine.TextRenderingModule" Private="false">
       <HintPath>$(GameDir)\Chill With You_Data\Managed\UnityEngine.TextRenderingModule.dll</HintPath>
     </Reference>
-    <Reference Include="UnityEngine.UI">
+    <Reference Include="UnityEngine.UI" Private="false">
       <HintPath>$(GameDir)\Chill With You_Data\Managed\UnityEngine.UI.dll</HintPath>
     </Reference>
-    <Reference Include="UnityEngine.UIModule">
+    <Reference Include="UnityEngine.UIModule" Private="false">
       <HintPath>$(GameDir)\Chill With You_Data\Managed\UnityEngine.UIModule.dll</HintPath>
     </Reference>
-    <Reference Include="UniTask">
+    <Reference Include="UniTask" Private="false">
       <HintPath>$(GameDir)\Chill With You_Data\Managed\UniTask.dll</HintPath>
     </Reference>
-    <Reference Include="VContainer">
+    <Reference Include="VContainer" Private="false">
       <HintPath>$(GameDir)\Chill With You_Data\Managed\VContainer.dll</HintPath>
     </Reference>
-    <Reference Include="Unity.RenderPipelines.Core.Runtime">
+    <Reference Include="Unity.RenderPipelines.Core.Runtime" Private="false">
       <HintPath>$(GameDir)\Chill With You_Data\Managed\Unity.RenderPipelines.Core.Runtime.dll</HintPath>
     </Reference>
-    <Reference Include="Unity.RenderPipelines.Universal.Runtime">
+    <Reference Include="Unity.RenderPipelines.Universal.Runtime" Private="false">
       <HintPath>$(GameDir)\Chill With You_Data\Managed\Unity.RenderPipelines.Universal.Runtime.dll</HintPath>
     </Reference>
   </ItemGroup>
 
   <ItemGroup>
-    <!-- Core -->
-    <Compile Include="Core\Enums.cs" />
-    <Compile Include="Core\Constants.cs" />
-    <Compile Include="Core\PotatoPlugin.cs" />
-    <Compile Include="Core\PotatoController.cs" />
-    
-    <!-- Configuration -->
-    <Compile Include="Configuration\ConfigurationManager.cs" />
-    
-    <!-- Features -->
-    <Compile Include="Features\RenderQualityManager.cs" />
-    <Compile Include="Features\AudioManager.cs" />
-    <Compile Include="Features\CameraMirrorManager.cs" />
-    <Compile Include="Features\NoteExportFolderPicker.cs" />
-    <Compile Include="Features\NoteExportManager.cs" />
-    <Compile Include="Features\NoteExportSelectionState.cs" />
-    <Compile Include="Features\PortraitModeManager.cs" />
-    <Compile Include="Features\PiPGuiManager.cs" />
-    <Compile Include="Features\WindowStateManager.cs" />
-    <Compile Include="Features\CostumeWhisperHelper.cs" />
-    
-    <!-- Utilities -->
-    <Compile Include="Utilities\WindowManager.cs" />
-    <Compile Include="Utilities\TypeHelper.cs" />
-    <Compile Include="Utilities\NoteExportNaming.cs" />
-    
-    <!-- Patches -->
-    <Compile Include="Patches\ExitConfirmationDialogHelper.cs" />
-    <Compile Include="Patches\InputPatches.cs" />
-    <Compile Include="Patches\NoteExportPatch.cs" />
-    <Compile Include="Patches\NoteExportStateCapturePolicy.cs" />
-    <Compile Include="Patches\NoteExportHeaderLayout.cs" />
-    <Compile Include="Patches\NoteDeleteConfirmPatch.cs" />
-    <Compile Include="Patches\TodoDeleteConfirmPatch.cs" />
-    <Compile Include="Patches\CostumePatch.cs" />
-    
-    <!-- UI -->
-    <Compile Include="UI\ModPulldownCloner.cs" />
-    <Compile Include="UI\ModSettingsManager.cs" />
-    <Compile Include="UI\ModSettingsIntegration.cs" />
-    <Compile Include="UI\ModSettingsRectLayoutSnapshot.cs" />
-    <Compile Include="UI\ModSettingsStyle.cs" />
-    <Compile Include="UI\PulldownLayerTransition.cs" />
-    <Compile Include="UI\SettingUITabFieldSelector.cs" />
-    <Compile Include="UI\ModToggleCloner.cs" />
-    <Compile Include="UI\ModInputFieldCloner.cs" />
-    <Compile Include="UI\VisibleWhen.cs" />
-    <Compile Include="UI\VisibleWhenEvaluator.cs" />
-    <Compile Include="UI\Localization\ModLocalizer.cs" />
-    <Compile Include="UI\Localization\ModTranslationManager.cs" />
-    
-    
-    <!-- Properties -->
-    <Compile Include="Properties\AssemblyInfo.cs" />
+    <PackageReference Include="BepInEx.AssemblyPublicizer.MSBuild" Version="0.4.3">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>build; contentfiles</IncludeAssets>
+    </PackageReference>
   </ItemGroup>
-
-  <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
 </Project>
