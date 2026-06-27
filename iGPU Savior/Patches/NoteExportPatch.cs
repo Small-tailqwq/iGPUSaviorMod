@@ -1,5 +1,4 @@
 using System;
-using System.Reflection;
 using HarmonyLib;
 using R3;
 using TMPro;
@@ -24,15 +23,7 @@ namespace PotatoOptimization.Patches
     private const string NoteTitleTextName = "NoteTitleText";
     private const float HeaderButtonGap = 6f;
 
-    private static readonly FieldInfo FI_SelectPageListUI = AccessTools.Field(typeof(NoteUI), "_selectPageListUI");
-    private static readonly FieldInfo FI_CurrentPageUI = AccessTools.Field(typeof(NoteUI), "_currentPageUI");
-    private static readonly FieldInfo FI_AddSelectPageUIButton = AccessTools.Field(typeof(SelectPageListUI), "_addSelectPageUIButton");
-    private static readonly FieldInfo FI_TitleInputField = AccessTools.Field(typeof(CurrentPageUI), "_titleInputField");
-    private static readonly FieldInfo FI_MainInputField = AccessTools.Field(typeof(CurrentPageUI), "_mainInputField");
-
     private static NoteExportManager _manager;
-
-    private static readonly FieldInfo FI_NoteCloseButton = AccessTools.Field(typeof(NoteUI), "_noteCloseButton");
 
     private static void Postfix(NoteUI __instance)
     {
@@ -50,11 +41,11 @@ namespace PotatoOptimization.Patches
           context = __instance.gameObject.AddComponent<NoteExportUiContext>();
         }
 
-        var selectPageListUI = FI_SelectPageListUI.GetValue(__instance) as SelectPageListUI;
-        var currentPageUI = FI_CurrentPageUI.GetValue(__instance) as CurrentPageUI;
-        var addButton = selectPageListUI != null ? FI_AddSelectPageUIButton.GetValue(selectPageListUI) as Button : null;
-        var titleInput = currentPageUI != null ? FI_TitleInputField.GetValue(currentPageUI) as TMP_InputField : null;
-        var mainInput = currentPageUI != null ? FI_MainInputField.GetValue(currentPageUI) as TMP_InputField : null;
+        var selectPageListUI = __instance._selectPageListUI;
+        var currentPageUI = __instance._currentPageUI;
+        var addButton = selectPageListUI?._addSelectPageUIButton;
+        var titleInput = currentPageUI?._titleInputField;
+        var mainInput = currentPageUI?._mainInputField;
 
         if (addButton == null)
         {
@@ -62,7 +53,7 @@ namespace PotatoOptimization.Patches
         }
 
         var headerAnchor = FindNoteTitleText(__instance.transform);
-        var closeButton = FI_NoteCloseButton.GetValue(__instance) as Button;
+        var closeButton = __instance._noteCloseButton;
         var closeButtonRect = closeButton != null ? closeButton.transform as RectTransform : null;
         var buttonParent = closeButtonRect != null ? closeButtonRect.parent as RectTransform : null;
         if (headerAnchor == null || closeButtonRect == null || buttonParent == null)
@@ -280,20 +271,10 @@ namespace PotatoOptimization.Patches
     {
       try
       {
-        var localizerType = Type.GetType("Bulbul.TextLocalizationBehaviour, Assembly-CSharp");
-        if (localizerType == null)
-        {
-          return;
-        }
-
-        var localizers = gameObject.GetComponentsInChildren(localizerType, true);
+        var localizers = gameObject.GetComponentsInChildren<TextLocalizationBehaviour>(true);
         foreach (var localizer in localizers)
         {
-          var component = localizer as Behaviour;
-          if (component != null)
-          {
-            component.enabled = false;
-          }
+          localizer.enabled = false;
         }
       }
       catch (Exception e)
@@ -306,12 +287,6 @@ namespace PotatoOptimization.Patches
   [HarmonyPatch(typeof(SelectPageUI), nameof(SelectPageUI.Setup))]
   internal static class NoteExportSelectPagePatch
   {
-    private static readonly FieldInfo FI_TitleInputField = AccessTools.Field(typeof(SelectPageUI), "_titleInputField");
-    private static readonly FieldInfo FI_SelectPageButton = AccessTools.Field(typeof(SelectPageUI), "_selectPageButton");
-    private static readonly FieldInfo FI_ReorderTrigger = AccessTools.Field(typeof(SelectPageUI), "reorderTrigger");
-    private static readonly FieldInfo FI_DragUICanvasGroup = AccessTools.Field(typeof(SelectPageUI), "_dragUICanvasGroup");
-    private static readonly FieldInfo FI_RemovePageButton = AccessTools.Field(typeof(SelectPageUI), "_removePageButton");
-
     private static void Postfix(SelectPageUI __instance)
     {
       try
@@ -328,11 +303,11 @@ namespace PotatoOptimization.Patches
           card = __instance.gameObject.AddComponent<NoteExportCardState>();
         }
 
-        var titleInput = FI_TitleInputField.GetValue(__instance) as TMP_InputField;
-        var selectPageButton = FI_SelectPageButton.GetValue(__instance) as Button;
-        var reorderTrigger = FI_ReorderTrigger.GetValue(__instance) as EventTrigger;
-        var dragUICanvasGroup = FI_DragUICanvasGroup.GetValue(__instance) as CanvasGroup;
-        var removePageButton = FI_RemovePageButton.GetValue(__instance) as Button;
+        var titleInput = __instance._titleInputField;
+        var selectPageButton = __instance._selectPageButton;
+        var reorderTrigger = __instance.reorderTrigger;
+        var dragUICanvasGroup = __instance._dragUICanvasGroup;
+        var removePageButton = __instance._removePageButton;
 
         card.Bind(manager, __instance, titleInput, selectPageButton, reorderTrigger, dragUICanvasGroup, removePageButton);
         card.Refresh();

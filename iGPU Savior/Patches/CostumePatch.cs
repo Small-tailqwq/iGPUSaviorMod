@@ -9,28 +9,16 @@ namespace PotatoOptimization.Patches
     [HarmonyPatch]
     public static class CostumePatch
     {
-        private static Type _costumeChangeServiceType;
-
-        static CostumePatch()
-        {
-            try
-            {
-                _costumeChangeServiceType = typeof(CostumeChangeService);
-                PotatoPlugin.Log.LogInfo($"[CostumePatch] Initialized. Type={_costumeChangeServiceType?.FullName}");
-            }
-            catch (Exception e)
-            {
-                PotatoPlugin.Log.LogError("[CostumePatch] Failed to initialize: " + e);
-            }
-        }
-
         static MethodBase TargetMethod()
         {
-            return _costumeChangeServiceType?.GetMethod("LotterySkin", new[]
+            var method = AccessTools.Method(typeof(CostumeChangeService), "LotterySkin", new[]
             {
                 typeof(DateTime),
                 typeof(System.Collections.Generic.ICollection<string>)
             });
+            if (method == null)
+                PotatoPlugin.Log?.LogError("[CostumePatch] Failed to resolve CostumeChangeService.LotterySkin; patch will not be applied.");
+            return method;
         }
 
         [HarmonyPriority(Priority.First)]

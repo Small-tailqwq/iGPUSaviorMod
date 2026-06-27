@@ -6,46 +6,18 @@ using Bulbul;
 
 namespace PotatoOptimization.Patches
 {
-  /// <summary>
-  /// 待办删除二次确认补丁
-  /// 复用 ExitConfirmationDialogHelper 统一弹窗逻辑
-  /// </summary>
   [HarmonyPatch]
   public static class TodoDeleteConfirmPatch
   {
-    private static readonly Type TodoUIType;
-    private static readonly FieldInfo FI_OnDeleteAction;
-    private static readonly FieldInfo FI_TodoData;
-    private static readonly bool IsReady;
-
-    static TodoDeleteConfirmPatch()
-    {
-      try
-      {
-        var assembly = Assembly.Load("Assembly-CSharp");
-        TodoUIType = assembly.GetType("TodoUI");
-
-        if (TodoUIType != null)
-        {
-          FI_OnDeleteAction = TodoUIType.GetField("_onDeleteTodoAction", BindingFlags.Instance | BindingFlags.NonPublic);
-          FI_TodoData = TodoUIType.GetField("_todoData", BindingFlags.Instance | BindingFlags.NonPublic);
-        }
-
-        IsReady = TodoUIType != null && FI_OnDeleteAction != null && FI_TodoData != null;
-        PotatoPlugin.Log.LogInfo($"[TodoConfirm] Initialized. Ready={IsReady}");
-      }
-      catch (Exception e)
-      {
-        PotatoPlugin.Log.LogError("[TodoConfirm] Failed to initialize: " + e);
-      }
-    }
-
     static MethodBase TargetMethod()
     {
-      return TodoUIType?.GetMethod("OnClickButtonRemoveTodo", BindingFlags.Instance | BindingFlags.Public);
+      var method = AccessTools.Method(typeof(TodoUI), "OnClickButtonRemoveTodo");
+      if (method == null)
+        PotatoPlugin.Log?.LogError("[TodoConfirm] Failed to resolve TodoUI.OnClickButtonRemoveTodo; patch will not be applied.");
+      return method;
     }
 
-    static bool Prefix(object __instance)
+    static bool Prefix(TodoUI __instance)
     {
       try
       {
@@ -56,14 +28,11 @@ namespace PotatoOptimization.Patches
           return true;
         }
 
-        if (!IsReady || __instance == null)
-        {
+        if (__instance == null)
           return true;
-        }
 
-        // 提取待办数据，供确认回调使用
-        var deleteAction = FI_OnDeleteAction.GetValue(__instance) as Delegate;
-        var todoData = FI_TodoData.GetValue(__instance);
+        var deleteAction = __instance._onDeleteTodoAction;
+        var todoData = __instance._todoData;
 
         if (deleteAction == null || todoData == null)
         {
@@ -76,21 +45,12 @@ namespace PotatoOptimization.Patches
           "TODO_DELETE_CONFIRM_PROMPT",
           () =>
           {
-            try
-            {
-              deleteAction.DynamicInvoke(todoData);
-            }
-            catch (Exception e)
-            {
-              PotatoPlugin.Log.LogError("[TodoConfirm] Invoke delete action failed: " + e);
-            }
+            try { deleteAction.DynamicInvoke(todoData); }
+            catch (Exception e) { PotatoPlugin.Log.LogError("[TodoConfirm] Invoke failed: " + e); }
           },
-          () =>
-          {
-            PotatoPlugin.Log.LogInfo("[TodoConfirm] Cancelled delete.");
-          });
+          () => PotatoPlugin.Log.LogInfo("[TodoConfirm] Cancelled delete."));
 
-        return !shown; // shown=true 表示弹窗已接管，阻止原方法
+        return !shown;
       }
       catch (Exception e)
       {

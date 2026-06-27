@@ -9,47 +9,18 @@ namespace PotatoOptimization.Patches
   [HarmonyPatch]
   public static class NoteDeleteConfirmPatch
   {
-    private static readonly Type NoteServiceType;
-    private static readonly MethodInfo MI_RemovePage;
-    private static readonly bool IsReady;
     private static readonly HashSet<ulong> AllowedDeleteIds = new HashSet<ulong>();
     private static readonly object Gate = new object();
 
-    static NoteDeleteConfirmPatch()
-    {
-      try
-      {
-        PotatoPlugin.Log.LogInfo("[NoteConfirm] Static constructor starting...");
-        var assembly = Assembly.Load("Assembly-CSharp");
-        NoteServiceType = assembly.GetType("NoteService");
-        if (NoteServiceType != null)
-        {
-          MI_RemovePage = NoteServiceType.GetMethod(
-            "RemovePage",
-            BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic,
-            null,
-            new[] { typeof(ulong) },
-            null);
-        }
-
-        IsReady = NoteServiceType != null && MI_RemovePage != null;
-        PotatoPlugin.Log.LogInfo("[NoteConfirm] Initialized. Ready=" + IsReady);
-        PotatoPlugin.Log.LogInfo("[NoteConfirm] Type=" + (NoteServiceType != null ? NoteServiceType.FullName : "null"));
-        PotatoPlugin.Log.LogInfo("[NoteConfirm] RemovePage=" + (MI_RemovePage != null));
-      }
-      catch (Exception e)
-      {
-        PotatoPlugin.Log.LogError("[NoteConfirm] Failed to initialize: " + e);
-      }
-    }
-
     static MethodBase TargetMethod()
     {
-      PotatoPlugin.Log.LogInfo("[NoteConfirm] TargetMethod called. Found=" + (MI_RemovePage != null));
-      return MI_RemovePage;
+      var method = AccessTools.Method(typeof(NoteService), "RemovePage", new[] { typeof(ulong) });
+      if (method == null)
+        PotatoPlugin.Log?.LogError("[NoteConfirm] Failed to resolve NoteService.RemovePage; patch will not be applied.");
+      return method;
     }
 
-    static bool Prefix(object __instance, ulong __0)
+    static bool Prefix(NoteService __instance, ulong __0)
     {
       try
       {
@@ -60,23 +31,17 @@ namespace PotatoOptimization.Patches
           return true;
         }
 
-        if (!IsReady || __instance == null)
-        {
+        if (__instance == null)
           return true;
-        }
 
         var pageUniqueID = __0;
 
         lock (Gate)
         {
           if (AllowedDeleteIds.Remove(pageUniqueID))
-          {
-            PotatoPlugin.Log.LogInfo("[NoteConfirm] Allow original remove for pageId=" + pageUniqueID);
             return true;
-          }
         }
 
-        PotatoPlugin.Log.LogInfo("[NoteConfirm] Intercept remove pageId=" + pageUniqueID);
         var shown = ExitConfirmationDialogHelper.Show(
           "NoteDeleteConfirm",
           "NOTE_DELETE_CONFIRM_PROMPT",
@@ -84,27 +49,22 @@ namespace PotatoOptimization.Patches
           {
             try
             {
-              PotatoPlugin.Log.LogInfo("[NoteConfirm] Confirmed delete pageId=" + pageUniqueID);
               lock (Gate)
               {
                 AllowedDeleteIds.Add(pageUniqueID);
               }
 
-              MI_RemovePage.Invoke(__instance, new object[] { pageUniqueID });
+              __instance.RemovePage(pageUniqueID);
             }
             catch (Exception e)
             {
-              PotatoPlugin.Log.LogError("[NoteConfirm] Confirm invoke failed: " + e);
+              PotatoPlugin.Log.LogError("[NoteConfirm] Confirm failed: " + e);
             }
-          },
-          () =>
-          {
-            PotatoPlugin.Log.LogInfo("[NoteConfirm] Cancelled delete pageId=" + pageUniqueID);
           });
 
         if (!shown)
         {
-          PotatoPlugin.Log.LogWarning("[NoteConfirm] Dialog create failed, fallback original remove pageId=" + pageUniqueID);
+          PotatoPlugin.Log.LogWarning("[NoteConfirm] Dialog create failed, fallback to original remove pageId=" + pageUniqueID);
           return true;
         }
 
