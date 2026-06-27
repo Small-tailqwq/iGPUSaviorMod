@@ -3,9 +3,7 @@ using UnityEngine.UI;
 using TMPro;
 using System;
 using System.Collections;
-using System.Reflection;
 using PotatoOptimization.Core;
-using PotatoOptimization.Utilities;
 using Bulbul;
 
 namespace PotatoOptimization.UI
@@ -15,12 +13,6 @@ namespace PotatoOptimization.UI
   /// </summary>
   public class ModPulldownCloner
   {
-    // 使用 TypeHelper 获取类型
-    private static Type GetPulldownUIType()
-    {
-      return TypeHelper.GetPulldownUIType();
-    }
-
     /// <summary>
     /// Clone the game's GraphicQualityPulldownList and clear its options
     /// Returns a ready-to-use empty pulldown GameObject
@@ -238,68 +230,37 @@ namespace PotatoOptimization.UI
           {
             PotatoPlugin.Log.LogInfo($"Option clicked: {optionText}");
 
-            // === 修复点：使用通用方法获取类型，不再写死字符串 ===
             try
             {
-              Type pulldownType = GetPulldownUIType(); // <--- 使用新方法
-              if (pulldownType != null)
+              var pulldownUI = pulldownClone.GetComponent<PulldownListUI>();
+              if (pulldownUI == null)
+                pulldownUI = pulldownClone.GetComponentInChildren<PulldownListUI>();
+
+              if (pulldownUI != null)
               {
-                // 尝试在自身或子物体查找组件
-                var pulldownUI = pulldownClone.GetComponent(pulldownType);
-                if (pulldownUI == null)
-                  pulldownUI = pulldownClone.GetComponentInChildren(pulldownType);
+                var lang = ResolveCurrentLanguage();
 
-                if (pulldownUI != null)
+                var paths = new[] { "PulldownList/Pulldown/CurrentSelectText (TMP)", "CurrentSelectText (TMP)" };
+                foreach (var p in paths)
                 {
-                  // Update selected text logic:
-                  // 1. Get Translated text for immediate visual update
-                  var langSupplier = NestopiSystem.DIContainers.ProjectLifetimeScope.Resolve<Bulbul.LanguageSupplier>();
-                  var lang = langSupplier != null ? langSupplier.Language.CurrentValue : Bulbul.GameLanguageType.English; // Use R3 CurrentValue or Subscription?
-                                                                                                                          // NOTE: LanguageSupplier.Language is ReactiveProperty<GameLanguageType> usually.
-                                                                                                                          // Assuming NestopiSystem R3 usage, .CurrentValue is correct.
-                                                                                                                          // If failing, safely fallback.
-                                                                                                                          // Wait, I can use ModLocalizer's cached logic or just ModTranslationManager with English if accessing static supplier is hard?
-                                                                                                                          // Using user's provided ModLocalizer usage style:
-                                                                                                                          // Actually ModTranslationManager.Get(key, ...) needs type.
-                                                                                                                          // Let's rely on ModLocalizer on the header to update itself!
-
-                  // Update the ModLocalizer on the header FIRST
-                  var paths = new[] { "PulldownList/Pulldown/CurrentSelectText (TMP)", "CurrentSelectText (TMP)" };
-                  foreach (var p in paths)
+                  var t = pulldownClone.transform.Find(p);
+                  if (t != null)
                   {
-                    var t = pulldownClone.transform.Find(p);
-                    if (t != null)
-                    {
-                      var headerLoc = t.GetComponent<ModLocalizer>();
-                      if (headerLoc != null)
-                      {
-                        headerLoc.Key = optionText; // This triggers Refresh() immediately due to Property setter!
-                                                    // Since Refresh() sets text, we might not strictly need the game method update,
-                                                    // BUT the game method might do other internal state logic.
-                      }
-                      break;
-                    }
-                  }
-
-                  // Also call game method with translated text (for consistency/internal state)
-                  string finalVisualText = ModTranslationManager.Get(optionText, lang);
-                  if (string.IsNullOrEmpty(finalVisualText)) finalVisualText = optionText; // Fallback
-
-                  var changeTextMethod = pulldownType.GetMethod("ChangeSelectContentText", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
-                  if (changeTextMethod != null)
-                  {
-                    changeTextMethod.Invoke(pulldownUI, new object[] { finalVisualText });
-                    PotatoPlugin.Log.LogInfo($"Updated selected text to: {finalVisualText}");
-                  }
-
-                  // Close the pulldown
-                  var closePullDownMethod = pulldownType.GetMethod("ClosePullDown", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
-                  if (closePullDownMethod != null)
-                  {
-                    closePullDownMethod.Invoke(pulldownUI, new object[] { false });
-                    PotatoPlugin.Log.LogInfo("Dropdown closed via ClosePullDown()");
+                    var headerLoc = t.GetComponent<ModLocalizer>();
+                    if (headerLoc != null)
+                      headerLoc.Key = optionText;
+                    break;
                   }
                 }
+
+                string finalVisualText = ModTranslationManager.Get(optionText, lang);
+                if (string.IsNullOrEmpty(finalVisualText)) finalVisualText = optionText;
+
+                pulldownUI.ChangeSelectContentText(finalVisualText);
+                PotatoPlugin.Log.LogInfo($"Updated selected text to: {finalVisualText}");
+
+                pulldownUI.ClosePullDown(false);
+                PotatoPlugin.Log.LogInfo("Dropdown closed via ClosePullDown()");
               }
             }
             catch (Exception ex)
@@ -324,6 +285,22 @@ namespace PotatoOptimization.UI
       {
         PotatoPlugin.Log.LogError($"Failed to add option: {e}");
       }
+    }
+
+    private static GameLanguageType ResolveCurrentLanguage()
+    {
+      try
+      {
+        var langSupplier = NestopiSystem.DIContainers.ProjectLifetimeScope.Resolve<LanguageSupplier>();
+        if (langSupplier?.Language != null)
+          return langSupplier.Language.CurrentValue;
+      }
+      catch (Exception e)
+      {
+        PotatoPlugin.Log.LogWarning($"[ModPulldownCloner] Language fallback: {e.Message}");
+      }
+
+      return GameLanguageType.ChineseSimplified;
     }
 
     public static void MountPulldown(GameObject pulldownClone, string parentPath)
@@ -352,26 +329,15 @@ namespace PotatoOptimization.UI
     {
       try
       {
-        // 1. 获取类型 (使用通用方法)
-        Type pulldownUIType = GetPulldownUIType();
-        if (pulldownUIType == null)
-        {
-          PotatoPlugin.Log.LogError("PulldownListUI type not found");
-          return;
-        }
-
-        // 2. 找到关键节点
         Transform pulldownList = clone.transform.Find("PulldownList");
         Transform pulldown = clone.transform.Find("PulldownList/Pulldown");
         Transform pulldownButton = clone.transform.Find("PulldownList/PulldownButton");
         Transform currentSelectText = clone.transform.Find("PulldownList/Pulldown/CurrentSelectText (TMP)");
 
-        // 3. 挂载 PulldownListUI 脚本
         GameObject uiHost = (pulldownList != null) ? pulldownList.gameObject : clone;
-        Component pulldownUI = uiHost.GetComponent(pulldownUIType);
-        if (pulldownUI == null) pulldownUI = uiHost.AddComponent(pulldownUIType);
+        var pulldownUI = uiHost.GetComponent<PulldownListUI>();
+        if (pulldownUI == null) pulldownUI = uiHost.AddComponent<PulldownListUI>();
 
-        // 4. 获取必要的组件引用
         Button pulldownButtonComp = pulldownButton?.GetComponent<Button>();
         TMP_Text currentSelectTextComp = currentSelectText?.GetComponent<TMP_Text>();
         RectTransform pulldownParentRect = pulldown?.GetComponent<RectTransform>();
@@ -379,13 +345,6 @@ namespace PotatoOptimization.UI
         RectTransform contentRect = content?.GetComponent<RectTransform>();
 
         if (pulldownButtonComp == null || currentSelectTextComp == null || pulldownParentRect == null) return;
-
-        // 5. 反射辅助方法
-        void SetField(string fieldName, object value)
-        {
-          if (value == null) return;
-          pulldownUIType.GetField(fieldName, BindingFlags.NonPublic | BindingFlags.Instance)?.SetValue(pulldownUI, value);
-        }
 
         // =========================================================================
         // 🔥 核心修复：高度计算与滚动条构建 🔥
@@ -522,17 +481,15 @@ namespace PotatoOptimization.UI
 
         layerController.Initialize(pulldownUI, rootCanvas);
 
-        // 8. 继续反射赋值
-        SetField("_currentSelectContentText", currentSelectTextComp);
-        SetField("_pullDownParentRect", pulldownParentRect);
-        SetField("_openPullDownSizeDeltaY", openSize);
-        SetField("_pullDownOpenCloseSeconds", 0.3f);
-        SetField("_pullDownOpenButton", pulldownButtonComp);
-        SetField("_pullDownButtonRect", pulldownButtonRect);
-        SetField("_isOpen", false);
+        pulldownUI._currentSelectContentText = currentSelectTextComp;
+        pulldownUI._pullDownParentRect = pulldownParentRect;
+        pulldownUI._openPullDownSizeDeltaY = openSize;
+        pulldownUI._pullDownOpenCloseSeconds = 0.3f;
+        pulldownUI._pullDownOpenButton = pulldownButtonComp;
+        pulldownUI._pullDownButtonRect = pulldownButtonRect;
+        pulldownUI._isOpen = false;
 
-        // 9. 调用原版 Setup 方法
-        pulldownUIType.GetMethod("Setup")?.Invoke(pulldownUI, null);
+        pulldownUI.Setup();
       }
       catch (Exception e)
       {
@@ -546,18 +503,12 @@ namespace PotatoOptimization.UI
 
       try
       {
-        Type pulldownType = GetPulldownUIType();
-        if (pulldownType == null) return false;
-
-        var pulldownUI = pulldownClone.GetComponent(pulldownType)
-            ?? pulldownClone.GetComponentInChildren(pulldownType, true);
+        var pulldownUI = pulldownClone.GetComponent<PulldownListUI>();
+        if (pulldownUI == null)
+          pulldownUI = pulldownClone.GetComponentInChildren<PulldownListUI>(true);
         if (pulldownUI == null) return false;
 
-        var closeMethod = pulldownType.GetMethod("ClosePullDown",
-            BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
-        if (closeMethod == null) return false;
-
-        closeMethod.Invoke(pulldownUI, new object[] { false });
+        pulldownUI.ClosePullDown(false);
         return true;
       }
       catch (Exception e)
@@ -574,23 +525,19 @@ namespace PotatoOptimization.UI
   /// </summary>
   public class PulldownLayerController : MonoBehaviour
   {
-    private Component pulldownUI;
+    private PulldownListUI pulldownUI;
     private Canvas targetCanvas;
-    private FieldInfo isOpenField;
-    private FieldInfo closeSecondsField;
     private bool lastIsOpen = false;
     private bool isInitialized = false;
     private Coroutine releaseSortingCoroutine;
 
-    public void Initialize(Component pulldownUIComponent, Canvas canvas)
+    public void Initialize(PulldownListUI pulldownUIComponent, Canvas canvas)
     {
       pulldownUI = pulldownUIComponent;
       targetCanvas = canvas;
 
       if (pulldownUI != null)
       {
-        isOpenField = pulldownUI.GetType().GetField("_isOpen", BindingFlags.NonPublic | BindingFlags.Instance);
-        closeSecondsField = pulldownUI.GetType().GetField("_pullDownOpenCloseSeconds", BindingFlags.NonPublic | BindingFlags.Instance);
         isInitialized = true;
 
         // 强制刷新一次状态
@@ -601,11 +548,11 @@ namespace PotatoOptimization.UI
 
     private void Update()
     {
-      if (!isInitialized || pulldownUI == null || targetCanvas == null || isOpenField == null) return;
+      if (!isInitialized || pulldownUI == null || targetCanvas == null) return;
 
       try
       {
-        bool isOpen = (bool)isOpenField.GetValue(pulldownUI);
+        bool isOpen = pulldownUI._isOpen;
 
         // Only update when state changes to reduce overhead
         if (isOpen != lastIsOpen)
@@ -652,12 +599,12 @@ namespace PotatoOptimization.UI
         yield return new WaitForSeconds(delay);
 
       releaseSortingCoroutine = null;
-      if (!isInitialized || pulldownUI == null || targetCanvas == null || isOpenField == null) yield break;
+      if (!isInitialized || pulldownUI == null || targetCanvas == null) yield break;
 
       bool isOpen = false;
       try
       {
-        isOpen = (bool)isOpenField.GetValue(pulldownUI);
+        isOpen = pulldownUI._isOpen;
       }
       catch (Exception e)
       {
@@ -671,10 +618,7 @@ namespace PotatoOptimization.UI
 
     private float GetCloseAnimationSeconds()
     {
-      if (closeSecondsField == null || pulldownUI == null) return 0f;
-
-      object value = closeSecondsField.GetValue(pulldownUI);
-      return value is float seconds ? seconds : 0f;
+      return pulldownUI != null ? pulldownUI._pullDownOpenCloseSeconds : 0f;
     }
 
     private void StopReleaseSortingCoroutine()

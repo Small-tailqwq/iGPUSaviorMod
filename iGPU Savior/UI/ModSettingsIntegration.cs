@@ -16,8 +16,8 @@ namespace PotatoOptimization.UI
   [HarmonyPatch(typeof(SettingUI), "Setup")]
   public class ModSettingsIntegration
   {
-    private static GameObject modContentParent;
-    private static InteractableUI modInteractableUI;
+    internal static GameObject modContentParent;
+    internal static InteractableUI modInteractableUI;
     private static SettingUI cachedSettingUI;
     private static Canvas _rootCanvas;
     private static List<GameObject> modDropdowns = new List<GameObject>();
@@ -52,8 +52,8 @@ namespace PotatoOptimization.UI
     {
       try
       {
-        var creditsButton = AccessTools.Field(typeof(SettingUI), "_creditsInteractableUI").GetValue(settingUI) as InteractableUI;
-        var generalParent = AccessTools.Field(typeof(SettingUI), "_generalParent").GetValue(settingUI) as GameObject;
+        var creditsButton = settingUI._creditsInteractableUI;
+        var generalParent = settingUI._generalParent;
         if (creditsButton == null || generalParent == null) return;
 
         GameObject modTabButton = Object.Instantiate(creditsButton.gameObject);
@@ -381,17 +381,17 @@ namespace PotatoOptimization.UI
       foreach (var dropdown in modDropdowns)
       {
         if (dropdown == null) continue;
-        var pulldownListUI = dropdown.GetComponent("PulldownListUI") ??
-            dropdown.GetComponentInChildren(System.Type.GetType("Bulbul.PulldownListUI, Assembly-CSharp"));
-        pulldownListUI?.GetType().GetMethod("ClosePullDown")?.Invoke(pulldownListUI, new object[] { true });
+        var pulldownListUI = dropdown.GetComponent<PulldownListUI>();
+        if (pulldownListUI == null)
+          pulldownListUI = dropdown.GetComponentInChildren<PulldownListUI>();
+        pulldownListUI?.ClosePullDown(true);
       }
     }
 
     private static void PlayClickSound()
     {
       if (cachedSettingUI == null) return;
-      var sss = AccessTools.Field(typeof(SettingUI), "_systemSeService").GetValue(cachedSettingUI);
-      sss?.GetType().GetMethod("PlayClick")?.Invoke(sss, null);
+      cachedSettingUI._systemSeService?.PlayClick();
     }
   }
 
@@ -432,13 +432,13 @@ namespace PotatoOptimization.UI
     {
       try
       {
-        var modContentParent = AccessTools.Field(typeof(ModSettingsIntegration), "modContentParent").GetValue(null) as GameObject;
-        var modInteractableUI = AccessTools.Field(typeof(ModSettingsIntegration), "modInteractableUI").GetValue(null) as InteractableUI;
+        var modContentParent = ModSettingsIntegration.modContentParent;
+        var modInteractableUI = ModSettingsIntegration.modInteractableUI;
         modContentParent?.SetActive(false);
         modInteractableUI?.DeactivateUseUI(false);
 
-        var generalButton = AccessTools.Field(typeof(SettingUI), "_generalInteractableUI").GetValue(__instance) as InteractableUI;
-        var generalParent = AccessTools.Field(typeof(SettingUI), "_generalParent").GetValue(__instance) as GameObject;
+        var generalButton = __instance._generalInteractableUI;
+        var generalParent = __instance._generalParent;
         generalButton?.ActivateUseUI(false);
         generalParent?.SetActive(true);
 
