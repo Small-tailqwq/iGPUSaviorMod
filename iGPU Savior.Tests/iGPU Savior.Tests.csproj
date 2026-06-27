@@ -25,6 +25,8 @@
     <Compile Include="NoteExportHeaderLayoutTests.cs" />
     <Compile Include="ModSettingsRectLayoutSnapshotTests.cs" />
     <Compile Include="PulldownLayerTransitionTests.cs" />
+    <Compile Include="ProjectFilePolicyTests.cs" />
+    <Compile Include="PublicizerRefactorPolicyTests.cs" />
     <Compile Include="..\iGPU Savior\UI\SettingUITabFieldSelector.cs" Link="SettingUITabFieldSelector.cs" />
     <Compile Include="..\iGPU Savior\UI\ModSettingsRectLayoutSnapshot.cs" Link="ModSettingsRectLayoutSnapshot.cs" />
     <Compile Include="..\iGPU Savior\UI\PulldownLayerTransition.cs" Link="PulldownLayerTransition.cs" />
