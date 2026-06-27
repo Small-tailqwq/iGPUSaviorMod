@@ -41,7 +41,7 @@ string[] possiblePaths = new[]
 };
 ```
 
-如果路径查找失败,会回退到反射调用 `PulldownListUI.ChangeSelectContentText()`
+如果路径查找失败，会通过 publicized `PulldownListUI` 组件直接调用 `ChangeSelectContentText()` 更新当前选中项文本。
 
 ### 4. ✅ 添加"小窗缩放比例"配置
 

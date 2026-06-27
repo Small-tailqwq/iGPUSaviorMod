@@ -11,7 +11,7 @@ dotnet build "iGPU Savior\iGPU Savior.csproj" -c Release
 dotnet test "iGPU Savior.Tests\iGPU Savior.Tests.csproj"
 ```
 - csproj 默认 `GameDir=E:\SteamLibrary\...`，**必须改成你本机的路径**
-- 依赖全部来自 `GameDir` 下的本地 DLL，无 NuGet 包（测试工程除外）
+- 运行时依赖来自 `GameDir` 下的本地 DLL；主项目只使用 build-only `BepInEx.AssemblyPublicizer.MSBuild` NuGet 包，测试工程使用 xUnit 相关 NuGet 包
 
 ### 版本号管理
 - `version.json` 为唯一真实来源，运行 `scripts/sync-version.ps1` 同步到 `Constants.cs`、`thunderstore/manifest.json`、`CHANGELOG.md`

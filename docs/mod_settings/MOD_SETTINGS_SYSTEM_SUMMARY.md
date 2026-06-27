@@ -58,7 +58,7 @@ SettingUI.Setup() 被调用
   1. `CloneAndClearPulldown()` — Instantiate 模板，清空现有选项
   2. `GetSelectButtonTemplate()` — 从原模板获取第一个选项按钮作为克隆样板
   3. `AddOption()` — 为每个选项 Instantiate 按钮，绑定 `ModLocalizer`，注入点击回调
-  4. `EnsurePulldownListUI()` — 反射添加 `PulldownListUI` 组件，选项 > 6 时动态创建 ScrollRect+Viewport 结构，设置 Canvas overlay 排序（sortingOrder=30000）
+  4. `EnsurePulldownListUI()` — 通过 publicized `PulldownListUI` 直接挂载并初始化原生组件，选项 > 6 时动态创建 ScrollRect+Viewport 结构，设置 Canvas overlay 排序（sortingOrder=30000）
 - **附: `PulldownLayerController`** — 监听 `_isOpen` 状态，展开时提升 Canvas 层级确保在 UI 最顶层渲染
 
 ### ModInputFieldCloner
@@ -91,9 +91,9 @@ SettingUI.Setup() 被调用
 - **IsInitialized 属性**: 外部 MOD 可检查 `ModSettingsManager.Instance.IsInitialized` 判断是否可注册
 - **重建而非增量**: 每次 `RebuildUI()` 都清空 contentParent 并完整重建，避免增量更新的状态管理问题
 
-## 依赖类型解析
+## 游戏内部类型访问
 
-`TypeHelper.cs` 提供缓存的反射类型查找。游戏内的 `PulldownListUI` 和 `SettingUI` 类型可能位于不同程序集名称下（取决于游戏版本），TypeHelper 尝试多个可能的程序集名直到命中。
+主项目通过 `BepInEx.AssemblyPublicizer.MSBuild` 在编译期 publicize `Assembly-CSharp.dll`，因此多数游戏内部字段、方法和 UI 类型现在以强类型方式直接访问。保留的反射主要用于运行时动态发现标签按钮字段、URP 私有字段等少数场景。
 
 ## 配置持久化
 
