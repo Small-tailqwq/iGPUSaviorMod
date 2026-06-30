@@ -116,19 +116,23 @@ public static class VisibilityDecider
    - `focused == true` → `SetMode(Normal)`（获焦必然可见，事件驱动零延迟恢复；受 Potato/PiP 优先级约束）；
    - `focused == false` → 不切模式，置 `_pendingVisibilityCheck = true`，记录 `_lastVisibilityCheckTime = 0`（迫使下次 Update 立即执行可见性检查）。
 5. 改造 `Update()`：在现有"防止游戏覆盖设置"的刷新逻辑之前，插入可见性轮询块——
-   - 节流：`Time.realtimeSinceStartup - _lastVisibilityCheckTime > 0.5f` 或 `_pendingVisibilityCheck` 为真时执行；
-   - 调 `_visibilityChecker.IsGameWindowVisible(hwnd)`；
-   - 不可见且当前 `Normal` → `SetMode(Background)`；可见且当前 `Background` → `SetMode(Normal)`；
-   - `Potato` 模式 / `PiP` 活跃时不参与轮询切换（保持现有豁免）；
-   - 开关 `CfgEnableBackgroundOptimization` 关闭时不降级（保持现有逻辑）。
+   - 节流条件：`_pendingVisibilityCheck` 为真，或 `Time.realtimeSinceStartup - _lastVisibilityCheckTime > 0.5f`；
+   - 不满足节流条件则跳过整个轮询块（不复位 `_pendingVisibilityCheck`）；
+   - 满足条件后执行：`_pendingVisibilityCheck = false`（先复位，避免本帧后续异常导致永久挂起），`_lastVisibilityCheckTime = Time.realtimeSinceStartup`；
+   - `Potato` 模式 / `PiP` 活跃时：跳过可见性判定（保持现有豁免），但 `_pendingVisibilityCheck` 与时间戳仍按上述复位；
+   - 开关 `CfgEnableBackgroundOptimization` 关闭时：跳过降级判定，但若当前为 `Background` 则恢复 `Normal`（保持现有逻辑），复位照常；
+   - 开启且非豁免时：调 `_visibilityChecker.IsGameWindowVisible(hwnd)`，不可见且当前 `Normal` → `SetMode(Background)`，可见且当前 `Background` → `SetMode(Normal)`。
 6. `SetPiPModeActive` 中对 `Application.isFocused` 的引用改为调 `_visibilityChecker.IsGameWindowVisible`，避免 PiP 退出时误用焦点状态。
+7. `TogglePotatoMode`（关闭土豆模式时的分支）中 `Application.isFocused` 的引用同样改为 `_visibilityChecker.IsGameWindowVisible`：可见 → `Normal`，不可见且开关开启 → `Background`。与 `OnFocusChanged`/轮询保持同一判定口径，避免关闭土豆模式时因失焦误切 `Background`。
 
 ### 改造 `PotatoController`
 
 - `OnApplicationFocus`：继续调用 `_renderManager.OnFocusChanged(hasFocus)`（签名不变），行为变化由 `RenderQualityManager` 内部承接：
   - `hasFocus == true` → 内部立即恢复 `Normal`；
   - `hasFocus == false` → 内部仅标记待检查，不降级。
-- 日志文案更新："窗口获焦 → 恢复前台模式" 保留；"窗口失焦 → 后台省电模式" 改为 "窗口失焦 → 等待可见性确认"。
+- 日志触发条件与文案更新（当前 `OnApplicationFocus` 第 62-63 行用 `_renderManager?.IsBackgroundMode == true` 作为失焦日志条件，新逻辑下失焦不再立即切 `Background`，该条件永不成立会导致静默）：
+  - 获焦日志：`hasFocus && wasBackgroundMode` → 打印 "窗口获焦 → 恢复前台模式"（条件不变，`wasBackgroundMode` 取自失焦期间轮询的结果）；
+  - 失焦日志：`!hasFocus` → 无条件打印 "窗口失焦 → 等待可见性确认"（不再依赖 `IsBackgroundMode`），告知用户已进入待检查状态；实际降级发生时由 `RenderQualityManager.SetMode` 内部日志补一条 "窗口不可见 → 后台省电模式"。
 - `InitializeManagers`：创建 `WindowVisibilityChecker` 并传入 `RenderQualityManager`。
 
 ### 配置项
