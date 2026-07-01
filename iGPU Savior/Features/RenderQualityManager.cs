@@ -47,6 +47,7 @@ namespace PotatoOptimization.Features
         private readonly WindowVisibilityChecker _visibilityChecker;
         private float _lastVisibilityCheckTime;
         private bool _pendingVisibilityCheck;
+        private float _focusLostTime = -1f;
 
         // 反射缓存（URP 部分属性在编辑器中是只读的，需要通过反射写入）
         private static readonly PropertyInfo _propHDR = typeof(UniversalRenderPipelineAsset).GetProperty("supportsHDR");
@@ -127,13 +128,15 @@ namespace PotatoOptimization.Features
             if (focused)
             {
                 // 获焦必然可见，事件驱动零延迟恢复
+                _pendingVisibilityCheck = false;
+                _focusLostTime = -1f;
                 SetMode(RenderMode.Normal);
             }
             else
             {
-                // 失焦不直接降级，标记待可见性检查（Update 轮询承接）
+                // 失焦不直接降级，标记待可见性检查（Update 轮询在宽限期后承接）
                 _pendingVisibilityCheck = true;
-                _lastVisibilityCheckTime = 0f;
+                _focusLostTime = Time.realtimeSinceStartup;
             }
         }
 
@@ -143,8 +146,15 @@ namespace PotatoOptimization.Features
         public void Update()
         {
             // 可见性轮询（失焦后由轮询决定是否真正降级）
-            bool timeToCheck = _pendingVisibilityCheck ||
-                (Time.realtimeSinceStartup - _lastVisibilityCheckTime) > Constants.VisibilityCheckInterval;
+            // pending（失焦触发）需等宽限期过后才检查，避免 Alt+Tab 等瞬态切换误判；
+            // 常规轮询按当前模式选间隔：前台 0.5s 检测降级，后台 2s 检测恢复（获焦事件已零延迟覆盖主路径）
+            float checkInterval = _currentMode == RenderMode.Background
+                ? Constants.BackgroundVisibilityCheckInterval
+                : Constants.VisibilityCheckInterval;
+            bool graceElapsed = _focusLostTime <= 0f ||
+                (Time.realtimeSinceStartup - _focusLostTime) >= Constants.FocusLossGracePeriod;
+            bool regularDue = (Time.realtimeSinceStartup - _lastVisibilityCheckTime) > checkInterval;
+            bool timeToCheck = regularDue || (_pendingVisibilityCheck && graceElapsed);
             if (timeToCheck)
             {
                 _pendingVisibilityCheck = false;

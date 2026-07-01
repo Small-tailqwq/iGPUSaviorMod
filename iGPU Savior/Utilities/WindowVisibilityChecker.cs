@@ -87,18 +87,39 @@ namespace PotatoOptimization.Utilities
             // 前台窗口必在最前、不可能被其他窗口遮挡 → 仅跳过全屏遮挡判定(判定4)，
             // 最小化/虚拟桌面隐藏/拖出屏幕(判定1/2/3)仍照常执行。
             bool isForeground = GetForegroundWindow() == hwnd;
+            bool isIconic = SafeIsIconic(hwnd);
+            bool isCloaked = GetCloaked(hwnd);
+
+            // 短路：最小化或虚拟桌面隐藏时已判定不可见，无需枚举全屏窗口（省 CPU）
+            bool needFullscreenCheck = !isForeground && !isIconic && !isCloaked;
 
             var signals = new VisibilitySignals
             {
-                IsIconic = SafeIsIconic(hwnd),
-                IsCloaked = GetCloaked(hwnd),
+                IsIconic = isIconic,
+                IsCloaked = isCloaked,
                 WindowRect = ToVisRect(SafeGetWindowRect(hwnd)),
                 VirtualScreen = GetVirtualScreen(),
                 GameMonitor = gameMonitor,
-                FullscreenWindows = isForeground ? null : EnumerateFullscreenWindows(hwnd, gameMonHandle, gameMonitor)
+                FullscreenWindows = needFullscreenCheck ? EnumerateFullscreenWindows(hwnd, gameMonHandle, gameMonitor) : null
             };
 
-            return VisibilityDecider.IsVisible(signals);
+            bool result = VisibilityDecider.IsVisible(signals);
+            if (!result)
+            {
+                int fsCount = signals.FullscreenWindows?.Count ?? -1;
+                int fsOnGame = 0;
+                if (signals.FullscreenWindows != null)
+                {
+                    foreach (var fw in signals.FullscreenWindows)
+                        if (fw.IsOnGameMonitor) fsOnGame++;
+                }
+                PotatoPlugin.Log?.LogInfo(
+                    $"[可见性检查] 不可见: IsIconic={signals.IsIconic}, IsCloaked={signals.IsCloaked}, " +
+                    $"WinRect=({signals.WindowRect.Left},{signals.WindowRect.Top},{signals.WindowRect.Right},{signals.WindowRect.Bottom}), " +
+                    $"VScreen=({signals.VirtualScreen.Left},{signals.VirtualScreen.Top},{signals.VirtualScreen.Right},{signals.VirtualScreen.Bottom}), " +
+                    $"HasMonitor={signals.GameMonitor.HasValue}, FsTotal={fsCount}, FsOnGame={fsOnGame}, IsForeground={isForeground}");
+            }
+            return result;
         }
 
         private static bool SafeIsIconic(IntPtr hwnd)
@@ -152,7 +173,7 @@ namespace PotatoOptimization.Utilities
             {
                 try
                 {
-                    if (h == gameHwnd) return true;
+                    if (h == gameHwnd) return false; // 停止枚举：z-order 在游戏之下的窗口不可能遮挡游戏
                     if (!IsWindowVisible(h)) return true;
                     if (!GetWindowRect(h, out WindowManager.RECT r)) return true;
 

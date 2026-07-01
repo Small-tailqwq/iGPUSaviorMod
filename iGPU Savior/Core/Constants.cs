@@ -47,8 +47,14 @@ namespace PotatoOptimization.Core
     // 后台模式刷新间隔（秒）— 后台不需要高频刷新
     public const float BackgroundRunInterval = 5.0f;
 
-    // 可见性轮询间隔（秒）— 失焦后用此频率检查窗口是否真的不可见
+    // 可见性轮询间隔（秒）— 前台模式下用此频率检测是否需要降级
     public const float VisibilityCheckInterval = 0.5f;
+
+    // 后台模式可见性轮询间隔（秒）— 后台只需检测恢复，获焦事件已零延迟覆盖主路径
+    public const float BackgroundVisibilityCheckInterval = 2.0f;
+
+    // 失焦后宽限期（秒）— Alt+Tab 等瞬态切换在此期间不触发可见性检查
+    public const float FocusLossGracePeriod = 1.5f;
 
     // ==================== 竖屏优化常量 ====================
     public const float PortraitPositionXMultiplier = 1.053f;
