@@ -40,5 +40,7 @@
     <Compile Include="..\iGPU Savior\UI\VisibleWhen.cs" Link="VisibleWhen.cs" />
     <Compile Include="VisibleWhenEvaluatorTests.cs" />
     <Compile Include="..\iGPU Savior\UI\VisibleWhenEvaluator.cs" Link="VisibleWhenEvaluator.cs" />
+    <Compile Include="VisibilityDeciderTests.cs" />
+    <Compile Include="..\iGPU Savior\Utilities\VisibilityDecider.cs" Link="VisibilityDecider.cs" />
   </ItemGroup>
 </Project>

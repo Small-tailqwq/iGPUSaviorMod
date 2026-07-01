@@ -69,7 +69,7 @@ namespace PotatoOptimization.Configuration
 
             // 性能配置
             CfgEnableBackgroundOptimization = _config.Bind("Performance", "EnableBackgroundOptimization", true,
-                "窗口失焦时自动省电(限帧10fps+渲染分辨率0.1+关闭阴影)");
+                "游戏窗口不可见时自动省电(最小化/虚拟桌面切换/拖出屏幕/同显示器有全屏程序时触发:限帧10fps+渲染分辨率0.1+关闭阴影)");
 
             // 窗口配置
             CfgWindowScale = _config.Bind("Window", "ScaleRatio", WindowScaleRatio.OneThird, 

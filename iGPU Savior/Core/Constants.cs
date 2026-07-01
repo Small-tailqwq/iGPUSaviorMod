@@ -40,12 +40,15 @@ namespace PotatoOptimization.Core
     public const float PotatoModeRenderScale = 0.4f;
     public const float PotatoModeShadowDistance = 0f;
 
-    // 后台模式（窗口失焦自动触发，大幅降低渲染分辨率+帧数以省电）
+    // 后台模式（窗口不可见时自动触发，大幅降低渲染分辨率+帧数以省电）
     public const int BackgroundTargetFPS = 10;
     public const float BackgroundRenderScale = 0.1f;
 
     // 后台模式刷新间隔（秒）— 后台不需要高频刷新
     public const float BackgroundRunInterval = 5.0f;
+
+    // 可见性轮询间隔（秒）— 失焦后用此频率检查窗口是否真的不可见
+    public const float VisibilityCheckInterval = 0.5f;
 
     // ==================== 竖屏优化常量 ====================
     public const float PortraitPositionXMultiplier = 1.053f;

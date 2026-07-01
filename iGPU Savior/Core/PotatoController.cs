@@ -3,6 +3,7 @@ using UnityEngine;
 using UnityEngine.SceneManagement;
 using PotatoOptimization.Configuration;
 using PotatoOptimization.Features;
+using PotatoOptimization.Utilities;
 
 namespace PotatoOptimization.Core
 {
@@ -53,14 +54,14 @@ namespace PotatoOptimization.Core
 
         void OnApplicationFocus(bool hasFocus)
         {
-            // 焦点变化时通知渲染管理器切换后台/前台模式
+            // 焦点变化通知渲染管理器：获焦立即恢复，失焦仅标记待可见性检查
             bool wasBackgroundMode = _renderManager?.IsBackgroundMode == true;
             _renderManager?.OnFocusChanged(hasFocus);
 
             if (hasFocus && wasBackgroundMode)
                 PotatoPlugin.Log.LogWarning(">>> 窗口获焦 → 恢复前台模式 <<<");
-            else if (!hasFocus && _renderManager?.IsBackgroundMode == true)
-                PotatoPlugin.Log.LogWarning(">>> 窗口失焦 → 后台省电模式 <<<");
+            else if (!hasFocus)
+                PotatoPlugin.Log.LogWarning(">>> 窗口失焦 → 等待可见性确认 <<<");
         }
 
         void OnDestroy()
@@ -76,7 +77,8 @@ namespace PotatoOptimization.Core
         {
             // 创建功能管理器实例
             _audioManager = new AudioManager();
-            _renderManager = new RenderQualityManager();
+            _renderManager = new RenderQualityManager(
+                new WindowVisibilityChecker(WindowManager.GetCurrentWindowHandle));
             _mirrorManager = new CameraMirrorManager(_audioManager);
             _portraitManager = new PortraitModeManager();  // 默认禁用，由协程或用户手动启用
             _windowManager = new WindowStateManager(_config);

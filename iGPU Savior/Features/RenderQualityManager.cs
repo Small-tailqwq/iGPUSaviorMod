@@ -5,6 +5,7 @@ using UnityEngine;
 using UnityEngine.Rendering;
 using UnityEngine.Rendering.Universal;
 using PotatoOptimization.Core;
+using PotatoOptimization.Utilities;
 
 namespace PotatoOptimization.Features
 {
@@ -43,6 +44,9 @@ namespace PotatoOptimization.Features
         private float _origBgRenderScale;
         private float _origBgShadowDistance;
         private bool _isPiPModeActive;
+        private readonly WindowVisibilityChecker _visibilityChecker;
+        private float _lastVisibilityCheckTime;
+        private bool _pendingVisibilityCheck;
 
         // 反射缓存（URP 部分属性在编辑器中是只读的，需要通过反射写入）
         private static readonly PropertyInfo _propHDR = typeof(UniversalRenderPipelineAsset).GetProperty("supportsHDR");
@@ -55,6 +59,11 @@ namespace PotatoOptimization.Features
 
         public bool IsPotatoMode => _currentMode == RenderMode.Potato;
         public bool IsBackgroundMode => _currentMode == RenderMode.Background;
+
+        public RenderQualityManager(WindowVisibilityChecker visibilityChecker)
+        {
+            _visibilityChecker = visibilityChecker;
+        }
 
         /// <summary>
         /// 小窗已有较低渲染分辨率，期间完全豁免自动后台优化。
@@ -70,7 +79,7 @@ namespace PotatoOptimization.Features
             }
             else if (!active &&
                      _currentMode == RenderMode.Normal &&
-                     !Application.isFocused &&
+                     !_visibilityChecker.IsGameWindowVisible() &&
                      PotatoPlugin.Config.CfgEnableBackgroundOptimization.Value)
             {
                 SetMode(RenderMode.Background);
@@ -86,7 +95,7 @@ namespace PotatoOptimization.Features
             {
                 // 关闭土豆模式 → 如果窗口不在前台则切后台模式，否则切正常
                 if (_isPiPModeActive ||
-                    Application.isFocused ||
+                    _visibilityChecker.IsGameWindowVisible() ||
                     !PotatoPlugin.Config.CfgEnableBackgroundOptimization.Value)
                     SetMode(RenderMode.Normal);
                 else
@@ -115,11 +124,17 @@ namespace PotatoOptimization.Features
                 return;
             }
 
-            // 后台优化开关关闭时，失焦不做任何处理
-            if (!focused && !PotatoPlugin.Config.CfgEnableBackgroundOptimization.Value)
-                return;
-
-            SetMode(focused ? RenderMode.Normal : RenderMode.Background);
+            if (focused)
+            {
+                // 获焦必然可见，事件驱动零延迟恢复
+                SetMode(RenderMode.Normal);
+            }
+            else
+            {
+                // 失焦不直接降级，标记待可见性检查（Update 轮询承接）
+                _pendingVisibilityCheck = true;
+                _lastVisibilityCheckTime = 0f;
+            }
         }
 
         /// <summary>
@@ -127,6 +142,17 @@ namespace PotatoOptimization.Features
         /// </summary>
         public void Update()
         {
+            // 可见性轮询（失焦后由轮询决定是否真正降级）
+            bool timeToCheck = _pendingVisibilityCheck ||
+                (Time.realtimeSinceStartup - _lastVisibilityCheckTime) > Constants.VisibilityCheckInterval;
+            if (timeToCheck)
+            {
+                _pendingVisibilityCheck = false;
+                _lastVisibilityCheckTime = Time.realtimeSinceStartup;
+                PollVisibility();
+            }
+
+            // 开关关闭或 PiP 时，若仍处后台模式则恢复
             if (_currentMode == RenderMode.Background &&
                 (!PotatoPlugin.Config.CfgEnableBackgroundOptimization.Value || _isPiPModeActive))
             {
@@ -145,6 +171,25 @@ namespace PotatoOptimization.Features
             {
                 ApplyCurrentMode();
                 _lastRunTime = Time.realtimeSinceStartup;
+            }
+        }
+
+        private void PollVisibility()
+        {
+            if (_currentMode == RenderMode.Potato) return;
+            if (_isPiPModeActive) return;
+            if (!PotatoPlugin.Config.CfgEnableBackgroundOptimization.Value) return;
+
+            bool visible = _visibilityChecker.IsGameWindowVisible();
+            if (!visible && _currentMode == RenderMode.Normal)
+            {
+                SetMode(RenderMode.Background);
+                PotatoPlugin.Log.LogWarning(">>> 窗口不可见 → 后台省电模式 <<<");
+            }
+            else if (visible && _currentMode == RenderMode.Background)
+            {
+                SetMode(RenderMode.Normal);
+                PotatoPlugin.Log.LogWarning(">>> 窗口恢复可见 → 前台模式 <<<");
             }
         }
 
