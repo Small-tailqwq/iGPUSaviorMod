@@ -154,7 +154,9 @@ namespace PotatoOptimization.Features
             bool graceElapsed = _focusLostTime <= 0f ||
                 (Time.realtimeSinceStartup - _focusLostTime) >= Constants.FocusLossGracePeriod;
             bool regularDue = (Time.realtimeSinceStartup - _lastVisibilityCheckTime) > checkInterval;
-            bool timeToCheck = regularDue || (_pendingVisibilityCheck && graceElapsed);
+            // 有 pending（失焦触发）时以宽限期为唯一闸门，避免 regularDue 绕过宽限期；
+            // 无 pending 时走常规节流。
+            bool timeToCheck = _pendingVisibilityCheck ? graceElapsed : regularDue;
             if (timeToCheck)
             {
                 _pendingVisibilityCheck = false;
