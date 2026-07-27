@@ -66,6 +66,7 @@ namespace PotatoOptimization.Utilities
         }
 
         private readonly Func<IntPtr> _getGameWindowHandle;
+        private bool _wasLastCheckInvisible;
 
         public WindowVisibilityChecker(Func<IntPtr> getGameWindowHandle)
         {
@@ -77,6 +78,7 @@ namespace PotatoOptimization.Utilities
             IntPtr hwnd = _getGameWindowHandle();
             if (hwnd == IntPtr.Zero || !IsWindow(hwnd))
             {
+                _wasLastCheckInvisible = false;
                 PotatoPlugin.Log?.LogWarning("WindowVisibilityChecker: 游戏窗口句柄无效，按可见处理");
                 return true;
             }
@@ -104,14 +106,14 @@ namespace PotatoOptimization.Utilities
             };
 
             bool result = VisibilityDecider.IsVisible(signals);
-            if (!result)
+            if (!result && !_wasLastCheckInvisible)
             {
                 int fsCount = signals.FullscreenWindows?.Count ?? -1;
                 int fsOnGame = 0;
                 if (signals.FullscreenWindows != null)
                 {
                     foreach (var fw in signals.FullscreenWindows)
-                        if (fw.IsOnGameMonitor) fsOnGame++;
+                        if (fw.IsOnGameMonitor && !fw.IsCloaked) fsOnGame++;
                 }
                 PotatoPlugin.Log?.LogInfo(
                     $"[可见性检查] 不可见: IsIconic={signals.IsIconic}, IsCloaked={signals.IsCloaked}, " +
@@ -119,6 +121,7 @@ namespace PotatoOptimization.Utilities
                     $"VScreen=({signals.VirtualScreen.Left},{signals.VirtualScreen.Top},{signals.VirtualScreen.Right},{signals.VirtualScreen.Bottom}), " +
                     $"HasMonitor={signals.GameMonitor.HasValue}, FsTotal={fsCount}, FsOnGame={fsOnGame}, IsForeground={isForeground}");
             }
+            _wasLastCheckInvisible = !result;
             return result;
         }
 
@@ -184,7 +187,8 @@ namespace PotatoOptimization.Utilities
                     list.Add(new FullscreenWindowInfo
                     {
                         Rect = vr,
-                        IsOnGameMonitor = hmon == gameMonHandle
+                        IsOnGameMonitor = hmon == gameMonHandle,
+                        IsCloaked = GetCloaked(h)
                     });
                 }
                 catch { }

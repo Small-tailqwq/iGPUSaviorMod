@@ -27,6 +27,7 @@ namespace PotatoOptimization.Utilities
     {
         public VisRect Rect;
         public bool IsOnGameMonitor;
+        public bool IsCloaked;
     }
 
     public struct VisibilitySignals
@@ -59,17 +60,18 @@ namespace PotatoOptimization.Utilities
 
             foreach (var fw in list)
             {
+                if (fw.IsCloaked) continue;
                 if (!fw.IsOnGameMonitor) continue;
                 if (Covers(fw.Rect, gameBounds)) return false;
             }
             return true;
         }
 
-        // 相切（边缘重合）视为有交集 → 可见，故用严格不等号判定"完全在外"
+        // Win32 RECT 使用半开区间；边缘相切时交集面积为零，应视为不可见。
         private static bool RectsIntersect(VisRect a, VisRect b)
         {
-            return !(a.Right < b.Left || a.Left > b.Right ||
-                     a.Bottom < b.Top || a.Top > b.Bottom);
+            return !(a.Right <= b.Left || a.Left >= b.Right ||
+                     a.Bottom <= b.Top || a.Top >= b.Bottom);
         }
 
         private static bool Covers(VisRect cover, VisRect target)

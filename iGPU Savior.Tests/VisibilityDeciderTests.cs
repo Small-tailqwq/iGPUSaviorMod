@@ -35,12 +35,12 @@ namespace IGPUSavior.Tests
         }
 
         [Fact]
-        public void IsVisible_TouchingVirtualScreenEdge_ReturnsTrue()
+        public void IsVisible_TouchingVirtualScreenEdge_ReturnsFalse()
         {
-            // 窗口右边恰好贴到虚拟屏幕左边（相切），按"有交集"判为可见
+            // 窗口右边恰好贴到虚拟屏幕左边（相切），没有任何可见面积
             var s = NewSignals();
             s.WindowRect = new VisRect(-100, 0, 0, 100);
-            Assert.True(VisibilityDecider.IsVisible(s));
+            Assert.False(VisibilityDecider.IsVisible(s));
         }
 
         [Fact]
@@ -70,6 +70,22 @@ namespace IGPUSavior.Tests
             s.FullscreenWindows = new List<FullscreenWindowInfo>
             {
                 new FullscreenWindowInfo { Rect = VScreen, IsOnGameMonitor = false }
+            };
+            Assert.True(VisibilityDecider.IsVisible(s));
+        }
+
+        [Fact]
+        public void IsVisible_CloakedFullscreenOnGameMonitor_ReturnsTrue()
+        {
+            var s = NewSignals();
+            s.FullscreenWindows = new List<FullscreenWindowInfo>
+            {
+                new FullscreenWindowInfo
+                {
+                    Rect = VScreen,
+                    IsOnGameMonitor = true,
+                    IsCloaked = true
+                }
             };
             Assert.True(VisibilityDecider.IsVisible(s));
         }
