@@ -20,8 +20,7 @@ namespace PotatoOptimization.Patches
     private const string ExportButtonName = "PotatoNoteExportButton";
     private const string CancelButtonName = "PotatoNoteExportCancelButton";
     private const string ConfirmButtonName = "PotatoNoteExportConfirmButton";
-    private const string NoteTitleTextName = "NoteTitleText";
-    private const float HeaderButtonGap = 6f;
+    private const float StackedControlGap = 4f;
 
     private static NoteExportManager _manager;
 
@@ -52,37 +51,30 @@ namespace PotatoOptimization.Patches
           return;
         }
 
-        var headerAnchor = FindNoteTitleText(__instance.transform);
         var closeButton = __instance._noteCloseButton;
         var closeButtonRect = closeButton != null ? closeButton.transform as RectTransform : null;
         var buttonParent = closeButtonRect != null ? closeButtonRect.parent as RectTransform : null;
-        if (headerAnchor == null || closeButtonRect == null || buttonParent == null)
+        var addButtonRect = addButton.transform as RectTransform;
+        var noteListScrollRect = __instance.transform.Find("SelectNotes/Scroll View") as RectTransform;
+        if (closeButtonRect == null || buttonParent == null || addButtonRect == null)
         {
           return;
         }
 
         context.Bind(manager, addButton, titleInput, mainInput);
-        EnsureButtons(context, addButton, buttonParent, headerAnchor, closeButtonRect);
+        EnsureButtons(
+          context,
+          addButton,
+          buttonParent,
+          closeButtonRect,
+          addButtonRect,
+          noteListScrollRect);
         context.Refresh();
       }
       catch (Exception e)
       {
         PotatoPlugin.Log?.LogError("[NoteExport] Failed to inject note export UI: " + e);
       }
-    }
-
-    private static RectTransform FindNoteTitleText(Transform noteUITransform)
-    {
-      var t = noteUITransform.Find(NoteTitleTextName);
-      if (t != null) return t as RectTransform;
-
-      if (noteUITransform.parent != null)
-      {
-        t = noteUITransform.parent.Find(NoteTitleTextName);
-        if (t != null) return t as RectTransform;
-      }
-
-      return null;
     }
 
     internal static NoteExportManager GetManager()
@@ -122,7 +114,13 @@ namespace PotatoOptimization.Patches
       return _manager;
     }
 
-    private static void EnsureButtons(NoteExportUiContext context, Button addButton, RectTransform buttonParent, RectTransform headerAnchor, RectTransform closeButtonRect)
+    private static void EnsureButtons(
+      NoteExportUiContext context,
+      Button addButton,
+      RectTransform buttonParent,
+      RectTransform closeButtonRect,
+      RectTransform addButtonRect,
+      RectTransform noteListScrollRect)
     {
       if (context.ExportButton == null)
       {
@@ -151,7 +149,10 @@ namespace PotatoOptimization.Patches
         });
       }
 
-      LayoutHeaderButtons(context, headerAnchor, closeButtonRect);
+      LayoutHeaderButtons(
+        context,
+        addButtonRect,
+        noteListScrollRect);
     }
 
     private static Button MakeHeaderButton(Button template, RectTransform parent, RectTransform closeButtonRect, string name, UnityAction onClick)
@@ -181,21 +182,89 @@ namespace PotatoOptimization.Patches
       return button;
     }
 
-    private static void LayoutHeaderButtons(NoteExportUiContext context, RectTransform headerAnchor, RectTransform closeButtonRect)
+    private static void LayoutHeaderButtons(
+      NoteExportUiContext context,
+      RectTransform addButtonRect,
+      RectTransform noteListScrollRect)
     {
       var exportRect = context.ExportButton.transform as RectTransform;
       var cancelRect = context.CancelButton.transform as RectTransform;
       var confirmRect = context.ConfirmButton.transform as RectTransform;
-      if (exportRect == null || cancelRect == null || confirmRect == null || headerAnchor == null || closeButtonRect == null) return;
+      if (exportRect == null || cancelRect == null || confirmRect == null || addButtonRect == null)
+        return;
 
-      float buttonY = NoteExportHeaderLayout.GetButtonY(headerAnchor.anchoredPosition.y);
-      float closeButtonWidth = closeButtonRect.rect.width > 0f ? closeButtonRect.rect.width : closeButtonRect.sizeDelta.x;
-      float buttonWidth = exportRect.rect.width > 0f ? exportRect.rect.width : exportRect.sizeDelta.x;
-      float exportButtonX = NoteExportHeaderLayout.GetPrimaryButtonX(closeButtonRect.anchoredPosition.x, closeButtonWidth, buttonWidth, HeaderButtonGap);
+      PlaceButtonAtAddButton(cancelRect, addButtonRect);
+      PlaceExportButtonBelowAddButton(exportRect, addButtonRect, StackedControlGap);
+      PlaceExportButtonBelowAddButton(confirmRect, addButtonRect, StackedControlGap);
+      ReserveListSpaceBelowExportButton(exportRect, addButtonRect, noteListScrollRect, StackedControlGap);
+    }
 
-      exportRect.anchoredPosition = new Vector2(exportButtonX, buttonY);
-      cancelRect.anchoredPosition = new Vector2(exportButtonX, buttonY);
-      confirmRect.anchoredPosition = new Vector2(NoteExportHeaderLayout.GetSecondaryButtonX(exportButtonX, buttonWidth, HeaderButtonGap), buttonY);
+    private static void PlaceButtonAtAddButton(
+      RectTransform buttonRect,
+      RectTransform addButtonRect)
+    {
+      var parent = buttonRect.parent as RectTransform;
+      if (parent == null) return;
+
+      var addCenterInParent = parent.InverseTransformPoint(addButtonRect.TransformPoint(addButtonRect.rect.center));
+      float anchorX = Mathf.Lerp(parent.rect.xMin, parent.rect.xMax, buttonRect.anchorMin.x);
+      float anchorY = Mathf.Lerp(parent.rect.yMin, parent.rect.yMax, buttonRect.anchorMin.y);
+      buttonRect.anchoredPosition = new Vector2(
+        addCenterInParent.x - anchorX,
+        addCenterInParent.y - anchorY);
+    }
+
+    private static void PlaceExportButtonBelowAddButton(
+      RectTransform exportRect,
+      RectTransform addButtonRect,
+      float gap)
+    {
+      var parent = exportRect.parent as RectTransform;
+      if (parent == null) return;
+
+      var addCenterInParent = parent.InverseTransformPoint(addButtonRect.TransformPoint(addButtonRect.rect.center));
+      float anchorX = Mathf.Lerp(parent.rect.xMin, parent.rect.xMax, exportRect.anchorMin.x);
+      float anchorY = Mathf.Lerp(parent.rect.yMin, parent.rect.yMax, exportRect.anchorMin.y);
+      float exportCenterY = NoteExportHeaderLayout.GetStackedControlCenterY(
+        addCenterInParent.y,
+        addButtonRect.rect.height,
+        exportRect.rect.height,
+        gap);
+
+      exportRect.anchoredPosition = new Vector2(
+        addCenterInParent.x - anchorX,
+        exportCenterY - anchorY);
+    }
+
+    private static void ReserveListSpaceBelowExportButton(
+      RectTransform exportRect,
+      RectTransform addButtonRect,
+      RectTransform noteListScrollRect,
+      float gap)
+    {
+      var scrollParent = noteListScrollRect != null
+        ? noteListScrollRect.parent as RectTransform
+        : null;
+      if (scrollParent == null) return;
+
+      float exportCenterY = NoteExportHeaderLayout.GetStackedControlCenterY(
+        addButtonRect.rect.center.y,
+        addButtonRect.rect.height,
+        exportRect.rect.height,
+        gap);
+      float contentTopY = NoteExportHeaderLayout.GetFollowingContentTopY(
+        exportCenterY,
+        exportRect.rect.height,
+        gap);
+      var desiredTopWorld = addButtonRect.TransformPoint(new Vector3(
+        addButtonRect.rect.center.x,
+        contentTopY,
+        0f));
+      float desiredTopInParent = scrollParent.InverseTransformPoint(desiredTopWorld).y;
+
+      var offsetMax = noteListScrollRect.offsetMax;
+      offsetMax.y = desiredTopInParent - scrollParent.rect.yMax;
+      noteListScrollRect.offsetMax = offsetMax;
     }
 
     private static Button CloneActionButton(Button template, string name, UnityAction onClick)
@@ -552,6 +621,14 @@ namespace PotatoOptimization.Patches
   {
     private const string OverlayName = "PotatoNoteExportOverlay";
     private const string CheckboxName = "PotatoNoteExportCheckbox";
+    private const string CheckboxBaseName = "BaseCircle";
+    private const string CheckboxCheckName = "Check";
+    private const string CheckboxBaseSpriteName = "t_ui_todo_circle_anim_8";
+    private const string CheckboxCheckSpriteName = "t_ui_todo_circle_check";
+    private const float CheckboxSize = 32f;
+
+    private static Sprite _checkboxBaseSprite;
+    private static Sprite _checkboxCheckSprite;
 
     private NoteExportManager _manager;
     private SelectPageUI _pageUI;
@@ -561,7 +638,8 @@ namespace PotatoOptimization.Patches
     private CanvasGroup _dragUICanvasGroup;
     private Button _removePageButton;
     private Button _overlayButton;
-    private TMP_Text _checkboxText;
+    private Image _checkboxBaseImage;
+    private Image _checkboxCheckImage;
     private bool _isBound;
     private bool _hasOriginalTitleInputState;
     private bool _originalTitleInputInteractable;
@@ -642,9 +720,9 @@ namespace PotatoOptimization.Patches
         _overlayButton.gameObject.SetActive(isSelectionMode);
       }
 
-      if (_checkboxText != null)
+      if (_checkboxCheckImage != null)
       {
-        _checkboxText.text = isSelected ? "[x]" : "[ ]";
+        _checkboxCheckImage.gameObject.SetActive(isSelected);
       }
 
       if (_removePageButton != null)
@@ -685,10 +763,10 @@ namespace PotatoOptimization.Patches
 
     private void EnsureOverlay()
     {
-      if (_overlayButton != null && _checkboxText != null)
+      if (_overlayButton != null && _checkboxBaseImage != null && _checkboxCheckImage != null)
       {
         var existingOverlayRect = _overlayButton.transform as RectTransform;
-        var existingCheckboxRect = _checkboxText.transform.parent as RectTransform;
+        var existingCheckboxRect = _checkboxBaseImage.transform.parent as RectTransform;
         LayoutCheckboxRect(existingOverlayRect, existingCheckboxRect);
         return;
       }
@@ -741,30 +819,73 @@ namespace PotatoOptimization.Patches
       var checkboxRect = checkboxObject.GetComponent<RectTransform>();
       LayoutCheckboxRect(overlayRect, checkboxRect);
 
-      _checkboxText = checkboxObject.GetComponent<TMP_Text>();
-      if (_checkboxText == null)
+      ResolveCheckboxSprites();
+      _checkboxBaseImage = EnsureCheckboxImage(
+        checkboxObject.transform,
+        CheckboxBaseName,
+        _checkboxBaseSprite);
+      _checkboxCheckImage = EnsureCheckboxImage(
+        checkboxObject.transform,
+        CheckboxCheckName,
+        _checkboxCheckSprite);
+      _checkboxCheckImage.gameObject.SetActive(false);
+
+      var oldLabel = checkboxObject.transform.Find("Label");
+      if (oldLabel != null)
       {
-        var templateText = _titleInputField != null ? _titleInputField.textComponent : null;
-        if (templateText != null)
-        {
-          _checkboxText = UnityEngine.Object.Instantiate(templateText, checkboxObject.transform);
-          _checkboxText.rectTransform.anchorMin = Vector2.zero;
-          _checkboxText.rectTransform.anchorMax = Vector2.one;
-          _checkboxText.rectTransform.offsetMin = Vector2.zero;
-          _checkboxText.rectTransform.offsetMax = Vector2.zero;
-        }
-        else
-        {
-          _checkboxText = checkboxObject.AddComponent<TextMeshProUGUI>();
-        }
+        oldLabel.gameObject.SetActive(false);
       }
 
-      _checkboxText.name = "Label";
-      _checkboxText.alignment = TextAlignmentOptions.Center;
-      _checkboxText.raycastTarget = false;
-      _checkboxText.text = "[ ]";
-
       overlayObject.transform.SetAsLastSibling();
+    }
+
+    private static Image EnsureCheckboxImage(Transform parent, string name, Sprite sprite)
+    {
+      var imageTransform = parent.Find(name);
+      GameObject imageObject;
+      if (imageTransform != null)
+      {
+        imageObject = imageTransform.gameObject;
+      }
+      else
+      {
+        imageObject = new GameObject(name, typeof(RectTransform), typeof(CanvasRenderer), typeof(Image));
+        imageObject.transform.SetParent(parent, false);
+      }
+
+      var rect = imageObject.GetComponent<RectTransform>();
+      rect.anchorMin = Vector2.zero;
+      rect.anchorMax = Vector2.one;
+      rect.offsetMin = Vector2.zero;
+      rect.offsetMax = Vector2.zero;
+
+      var image = imageObject.GetComponent<Image>();
+      image.sprite = sprite;
+      image.color = Color.white;
+      image.preserveAspect = true;
+      image.raycastTarget = false;
+      return image;
+    }
+
+    private static void ResolveCheckboxSprites()
+    {
+      if (_checkboxBaseSprite != null && _checkboxCheckSprite != null) return;
+
+      var sprites = Resources.FindObjectsOfTypeAll<Sprite>();
+      foreach (var sprite in sprites)
+      {
+        if (sprite == null) continue;
+        if (_checkboxBaseSprite == null && sprite.name == CheckboxBaseSpriteName)
+        {
+          _checkboxBaseSprite = sprite;
+        }
+        else if (_checkboxCheckSprite == null && sprite.name == CheckboxCheckSpriteName)
+        {
+          _checkboxCheckSprite = sprite;
+        }
+
+        if (_checkboxBaseSprite != null && _checkboxCheckSprite != null) break;
+      }
     }
 
     private void CaptureOriginalStates(
@@ -814,21 +935,19 @@ namespace PotatoOptimization.Patches
         {
           checkboxRect.anchorMin = new Vector2(0f, 1f);
           checkboxRect.anchorMax = new Vector2(0f, 1f);
-          checkboxRect.pivot = new Vector2(0f, 1f);
-          checkboxRect.sizeDelta = new Vector2(40f, 24f);
-          checkboxRect.anchoredPosition = new Vector2(20f, -12f);
+          checkboxRect.pivot = new Vector2(0.5f, 0.5f);
+          checkboxRect.sizeDelta = new Vector2(CheckboxSize, CheckboxSize);
+          checkboxRect.anchoredPosition = new Vector2(20f, -20f);
         }
         return;
       }
 
-      float dragWidth = dragRect.rect.width > 0f ? dragRect.rect.width : dragRect.sizeDelta.x;
-      float dragHeight = dragRect.rect.height > 0f ? dragRect.rect.height : dragRect.sizeDelta.y;
       var localCenter = overlayRect.InverseTransformPoint(dragRect.TransformPoint(dragRect.rect.center));
 
       checkboxRect.anchorMin = new Vector2(0.5f, 0.5f);
       checkboxRect.anchorMax = new Vector2(0.5f, 0.5f);
       checkboxRect.pivot = new Vector2(0.5f, 0.5f);
-      checkboxRect.sizeDelta = new Vector2(Mathf.Max(36f, dragWidth), Mathf.Max(24f, dragHeight));
+      checkboxRect.sizeDelta = new Vector2(CheckboxSize, CheckboxSize);
       checkboxRect.anchoredPosition = new Vector2(localCenter.x, localCenter.y);
     }
 

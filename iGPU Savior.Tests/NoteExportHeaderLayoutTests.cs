@@ -28,5 +28,21 @@ namespace IGPUSavior.Tests
 
             Assert.Equal(-46.8f, buttonY, 3);
         }
+
+        [Fact]
+        public void GetStackedControlCenterY_PlacesControlBelowUpperControl()
+        {
+            float centerY = NoteExportHeaderLayout.GetStackedControlCenterY(0f, 40f, 40f, 4f);
+
+            Assert.Equal(-44f, centerY, 3);
+        }
+
+        [Fact]
+        public void GetFollowingContentTopY_LeavesGapBelowControl()
+        {
+            float topY = NoteExportHeaderLayout.GetFollowingContentTopY(-44f, 40f, 4f);
+
+            Assert.Equal(-68f, topY, 3);
+        }
     }
 }

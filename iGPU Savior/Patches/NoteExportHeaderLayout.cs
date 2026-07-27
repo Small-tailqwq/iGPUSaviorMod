@@ -16,5 +16,19 @@ namespace PotatoOptimization.Patches
         {
             return noteTitleTextY;
         }
+
+        internal static float GetStackedControlCenterY(
+            float upperControlCenterY,
+            float upperControlHeight,
+            float lowerControlHeight,
+            float gap)
+        {
+            return upperControlCenterY - ((upperControlHeight + lowerControlHeight) * 0.5f) - gap;
+        }
+
+        internal static float GetFollowingContentTopY(float controlCenterY, float controlHeight, float gap)
+        {
+            return controlCenterY - (controlHeight * 0.5f) - gap;
+        }
     }
 }
