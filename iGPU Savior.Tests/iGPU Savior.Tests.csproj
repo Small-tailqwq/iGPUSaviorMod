@@ -23,6 +23,9 @@
     <Compile Include="NoteExportManagerStateTests.cs" />
     <Compile Include="NoteExportStateCapturePolicyTests.cs" />
     <Compile Include="NoteExportHeaderLayoutTests.cs" />
+    <Compile Include="TodoExportFormatterTests.cs" />
+    <Compile Include="TodoExportManagerTests.cs" />
+    <Compile Include="ExportLocalizationTests.cs" />
     <Compile Include="ModSettingsRectLayoutSnapshotTests.cs" />
     <Compile Include="PulldownLayerTransitionTests.cs" />
     <Compile Include="ProjectFilePolicyTests.cs" />
@@ -36,6 +39,9 @@
     <Compile Include="..\iGPU Savior\Features\NoteExportSelectionState.cs" Link="NoteExportSelectionState.cs" />
     <Compile Include="..\iGPU Savior\Patches\NoteExportStateCapturePolicy.cs" Link="NoteExportStateCapturePolicy.cs" />
     <Compile Include="..\iGPU Savior\Patches\NoteExportHeaderLayout.cs" Link="NoteExportHeaderLayout.cs" />
+    <Compile Include="..\iGPU Savior\Utilities\TodoExportFormatter.cs" Link="TodoExportFormatter.cs" />
+    <Compile Include="..\iGPU Savior\Utilities\ExportLocalization.cs" Link="ExportLocalization.cs" />
+    <Compile Include="..\iGPU Savior\Features\TodoExportManager.cs" Link="TodoExportManager.cs" />
     <Compile Include="VisibleWhenFactoryTests.cs" />
     <Compile Include="..\iGPU Savior\UI\VisibleWhen.cs" Link="VisibleWhen.cs" />
     <Compile Include="VisibleWhenEvaluatorTests.cs" />

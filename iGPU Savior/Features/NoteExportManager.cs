@@ -13,6 +13,7 @@ namespace PotatoOptimization.Features
         private readonly NoteExportSelectionState _selectionState = new NoteExportSelectionState();
         private readonly NoteService _noteService;
         private readonly NoteExportFolderPicker _folderPicker;
+        private readonly Func<ExportLanguage> _languageProvider;
 
         public event Action<bool> OnSelectionModeChanged;
         public event Action<IReadOnlyCollection<ulong>> OnSelectionChanged;
@@ -21,10 +22,14 @@ namespace PotatoOptimization.Features
 
         internal Action<Action> DispatchToMainThread { get; set; } = action => action?.Invoke();
 
-        public NoteExportManager(NoteService noteService, NoteExportFolderPicker folderPicker)
+        public NoteExportManager(
+            NoteService noteService,
+            NoteExportFolderPicker folderPicker,
+            Func<ExportLanguage> languageProvider = null)
         {
             _noteService = noteService;
             _folderPicker = folderPicker;
+            _languageProvider = languageProvider ?? (() => ExportLanguage.English);
         }
 
         public bool IsSelectionMode => _selectionState.IsSelectionMode;
@@ -123,13 +128,17 @@ namespace PotatoOptimization.Features
             }
 
             IReadOnlyList<ulong> orderedPageIds = GetStableExportOrder(SelectedPageIds);
+            ExportLanguage language = _languageProvider();
             _folderPicker.BeginPickFolder(result =>
             {
-                DispatchToMainThread(() => ContinueExport(result, orderedPageIds));
+                DispatchToMainThread(() => ContinueExport(result, orderedPageIds, language));
             });
         }
 
-        private void ContinueExport(NoteExportFolderPicker.FolderPickerResult result, IReadOnlyList<ulong> orderedPageIds)
+        private void ContinueExport(
+            NoteExportFolderPicker.FolderPickerResult result,
+            IReadOnlyList<ulong> orderedPageIds,
+            ExportLanguage language)
         {
             if (result == null)
             {
@@ -164,7 +173,11 @@ namespace PotatoOptimization.Features
                 }
 
                 string title = _noteService.GetPageTitle(pageId) ?? string.Empty;
-                string filePath = GetUniqueExportFilePath(folderPath, title, reservedPaths);
+                string filePath = NoteExportNaming.GetUniqueExportFilePath(
+                    folderPath,
+                    title,
+                    ExportLocalization.GetNoteFallbackTitle(language),
+                    reservedPaths);
                 string content = NoteExportNaming.FormatExportContent(title, pageData.MainText);
 
                 try
@@ -201,32 +214,6 @@ namespace PotatoOptimization.Features
             return selectedPageIds
                 .OrderBy(pageId => pageId)
                 .ToArray();
-        }
-
-        private static string GetUniqueExportFilePath(string folderPath, string title, HashSet<string> reservedPaths)
-        {
-            string originalFileName = NoteExportNaming.GenerateExportFileName(title);
-            string candidatePath = Path.Combine(folderPath, originalFileName);
-            if (!File.Exists(candidatePath) && reservedPaths.Add(candidatePath))
-            {
-                return candidatePath;
-            }
-
-            string fileNameWithoutExtension = Path.GetFileNameWithoutExtension(originalFileName);
-            string extension = Path.GetExtension(originalFileName);
-
-            int suffix = 2;
-            while (true)
-            {
-                string suffixedFileName = $"{fileNameWithoutExtension}_{suffix}{extension}";
-                candidatePath = Path.Combine(folderPath, suffixedFileName);
-                if (!File.Exists(candidatePath) && reservedPaths.Add(candidatePath))
-                {
-                    return candidatePath;
-                }
-
-                suffix++;
-            }
         }
 
         private static void LogWarning(string message)

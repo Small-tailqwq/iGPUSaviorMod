@@ -72,6 +72,9 @@ namespace PotatoOptimization.Core
         var noteExportEndReorderGuardPatchType = typeof(NoteExportEndReorderGuardPatch);
         Log.LogInfo($"[Patch Init] Loaded NoteExportEndReorderGuardPatch: {noteExportEndReorderGuardPatchType.FullName}");
 
+        var todoExportPatchType = typeof(TodoExportPatch);
+        Log.LogInfo($"[Patch Init] Loaded TodoExportPatch: {todoExportPatchType.FullName}");
+
         var facilityClickMirrorType = typeof(FacilityClickHeroineMirrorPatch);
         Log.LogInfo($"[Patch Init] Loaded FacilityClickHeroineMirrorPatch: {facilityClickMirrorType.FullName}");
 

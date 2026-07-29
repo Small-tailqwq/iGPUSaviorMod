@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using Bulbul;
+using PotatoOptimization.Utilities;
 
 namespace PotatoOptimization.UI
 {
@@ -78,11 +79,14 @@ namespace PotatoOptimization.UI
       Add("SKIN_Tee_2", "T-Shirt Style 2", "Tシャツスタイル2", "T恤款式2");
 
       // Note Export
-      Add("NOTE_EXPORT_BUTTON", "Export", "エクスポート", "导出");
+      Add("NOTE_EXPORT_BUTTON", "Export", "書き出し", "导出");
       Add("NOTE_EXPORT_CANCEL", "Cancel", "キャンセル", "取消");
-      Add("NOTE_EXPORT_CONFIRM", "Confirm Export", "エクスポート確認", "确认导出");
+      Add("NOTE_EXPORT_CONFIRM", "Confirm Export", "書き出し確認", "确认导出");
       Add("NOTE_EXPORT_SUCCESS", "Export complete", "エクスポート完了", "导出完成");
       Add("NOTE_EXPORT_FAIL", "Export failed", "エクスポート失敗", "导出失败");
+
+      // Todo Export
+      Add("TODO_EXPORT_BUTTON", "Export", "書き出し", "导出");
     }
 
     public static string Get(string key, GameLanguageType lang)
@@ -104,6 +108,20 @@ namespace PotatoOptimization.UI
       // Fallback: if key is not found, maybe it IS the test (legacy support)
       // But ideally we return the key so we spot missing translations
       return key;
+    }
+
+    public static ExportLanguage ToExportLanguage(GameLanguageType language)
+    {
+      switch (language)
+      {
+        case GameLanguageType.Japanese:
+          return ExportLanguage.Japanese;
+        case GameLanguageType.ChineseSimplified:
+        case GameLanguageType.ChineseTraditional:
+          return ExportLanguage.Chinese;
+        default:
+          return ExportLanguage.English;
+      }
     }
   }
 }

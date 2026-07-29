@@ -11,6 +11,7 @@ using NestopiSystem.DIContainers;
 using PotatoOptimization.Core;
 using PotatoOptimization.Features;
 using PotatoOptimization.UI;
+using PotatoOptimization.Utilities;
 
 namespace PotatoOptimization.Patches
 {
@@ -102,7 +103,10 @@ namespace PotatoOptimization.Patches
           _manager.ExitSelectionMode();
         }
 
-        _manager = new NoteExportManager(noteService, new NoteExportFolderPicker());
+        _manager = new NoteExportManager(
+          noteService,
+          new NoteExportFolderPicker(),
+          ResolveExportLanguage);
         _manager.OnExportSuccess += message => PotatoPlugin.Log?.LogInfo("[NoteExport] " + message);
         _manager.OnExportFailure += message => PotatoPlugin.Log?.LogWarning("[NoteExport] " + message);
       }
@@ -334,6 +338,11 @@ namespace PotatoOptimization.Patches
       }
 
       return GameLanguageType.ChineseSimplified;
+    }
+
+    private static ExportLanguage ResolveExportLanguage()
+    {
+      return ModTranslationManager.ToExportLanguage(ResolveCurrentLanguage());
     }
 
     private static void DisableLocalization(GameObject gameObject)

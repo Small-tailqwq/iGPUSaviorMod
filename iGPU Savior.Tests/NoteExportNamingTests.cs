@@ -10,7 +10,9 @@ namespace IGPUSavior.Tests
         [Fact]
         public void GenerateExportFileName_RemovesInvalidCharacters_AndAppendsTimestamp()
         {
-            string fileName = NoteExportNaming.GenerateExportFileName("  My:/\\*?\"<>| Note  ");
+            string fileName = NoteExportNaming.GenerateExportFileName(
+                "  My:/\\*?\"<>| Note  ",
+                ExportLocalization.GetNoteFallbackTitle(ExportLanguage.English));
 
             Assert.Matches(@"^My Note_\d{8}_\d{6}\.txt$", fileName);
 
@@ -31,9 +33,19 @@ namespace IGPUSavior.Tests
         [Fact]
         public void GenerateExportFileName_FallsBackToNote_WhenSanitizedTitleIsEmpty()
         {
-            string fileName = NoteExportNaming.GenerateExportFileName("   :/\\*?\"<>|   ");
+            string fileName = NoteExportNaming.GenerateExportFileName(
+                "   :/\\*?\"<>|   ",
+                ExportLocalization.GetNoteFallbackTitle(ExportLanguage.English));
 
             Assert.Matches(@"^note_\d{8}_\d{6}\.txt$", fileName);
+        }
+
+        [Fact]
+        public void GenerateExportFileName_UsesRequestedFallback()
+        {
+            string fileName = NoteExportNaming.GenerateExportFileName("   :/\\*?\"<>|   ", "todo");
+
+            Assert.Matches(@"^todo_\d{8}_\d{6}\.txt$", fileName);
         }
 
         [Fact]

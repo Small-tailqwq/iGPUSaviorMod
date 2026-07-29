@@ -7,6 +7,28 @@ namespace Bulbul
     {
         public string MainText;
     }
+
+    public class TodoData
+    {
+        public ulong UniqueID;
+        public string TodoText;
+        public TodoState CurrentState;
+        public DateTime? Expire { get; set; }
+    }
+
+    public class TodoListData
+    {
+        public ulong UniqueID;
+        public string TitleText;
+        public Dictionary<ulong, TodoData> TodoDic = new Dictionary<ulong, TodoData>();
+        public List<ulong> TodoOrderList = new List<ulong>();
+    }
+}
+
+public enum TodoState
+{
+    Working = 0,
+    Complete = 1,
 }
 
 public class NoteService

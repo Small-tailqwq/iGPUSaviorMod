@@ -44,5 +44,17 @@ namespace IGPUSavior.Tests
 
             Assert.Equal(-68f, topY, 3);
         }
+
+        [Fact]
+        public void GetFollowingControlCenterX_PlacesControlToTheRight()
+        {
+            float centerX = NoteExportHeaderLayout.GetFollowingControlCenterX(
+                182.3f,
+                160f,
+                96f,
+                4f);
+
+            Assert.Equal(314.3f, centerX, 3);
+        }
     }
 }

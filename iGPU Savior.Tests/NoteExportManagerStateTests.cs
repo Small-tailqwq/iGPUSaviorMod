@@ -403,6 +403,35 @@ namespace IGPUSavior.Tests
         }
 
         [Fact]
+        public void ExportSelected_UsesJapaneseFallbackFileName()
+        {
+            string exportFolder = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
+            Directory.CreateDirectory(exportFolder);
+
+            try
+            {
+                var noteService = new NoteService();
+                noteService.SetPage(10UL, string.Empty, "本文");
+                var manager = new NoteExportManager(
+                    noteService,
+                    CreateFolderPicker(exportFolder),
+                    () => ExportLanguage.Japanese);
+                manager.EnterSelectionMode();
+                manager.ToggleSelection(10UL);
+
+                manager.ExportSelected();
+
+                string filePath = Assert.Single(Directory.GetFiles(exportFolder, "*.txt"));
+                Assert.StartsWith("ノート_", Path.GetFileName(filePath));
+                Assert.Equal("\r\n\r\n本文", File.ReadAllText(filePath, Encoding.UTF8));
+            }
+            finally
+            {
+                Directory.Delete(exportFolder, recursive: true);
+            }
+        }
+
+        [Fact]
         public void ExportSelected_WhenAllExportsFail_RaisesFailureAndKeepsSelection()
         {
             string missingFolder = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"), "missing");

@@ -1,4 +1,6 @@
 using System;
+using System.Collections.Generic;
+using System.IO;
 
 namespace PotatoOptimization.Utilities
 {
@@ -21,16 +23,46 @@ namespace PotatoOptimization.Utilities
             return sanitizedTitle.Trim();
         }
 
-        public static string GenerateExportFileName(string title)
+        public static string GenerateExportFileName(string title, string fallbackTitle)
         {
             string sanitizedTitle = SanitizeTitle(title);
 
             if (string.IsNullOrWhiteSpace(sanitizedTitle))
             {
-                sanitizedTitle = "note";
+                sanitizedTitle = fallbackTitle;
             }
 
             return $"{sanitizedTitle}_{DateTime.Now:yyyyMMdd_HHmmss}.txt";
+        }
+
+        public static string GetUniqueExportFilePath(
+            string folderPath,
+            string title,
+            string fallbackTitle,
+            HashSet<string> reservedPaths)
+        {
+            string originalFileName = GenerateExportFileName(title, fallbackTitle);
+            string candidatePath = Path.Combine(folderPath, originalFileName);
+            if (!File.Exists(candidatePath) && reservedPaths.Add(candidatePath))
+            {
+                return candidatePath;
+            }
+
+            string fileNameWithoutExtension = Path.GetFileNameWithoutExtension(originalFileName);
+            string extension = Path.GetExtension(originalFileName);
+
+            int suffix = 2;
+            while (true)
+            {
+                string suffixedFileName = $"{fileNameWithoutExtension}_{suffix}{extension}";
+                candidatePath = Path.Combine(folderPath, suffixedFileName);
+                if (!File.Exists(candidatePath) && reservedPaths.Add(candidatePath))
+                {
+                    return candidatePath;
+                }
+
+                suffix++;
+            }
         }
 
         public static string FormatExportContent(string originalTitle, string body)

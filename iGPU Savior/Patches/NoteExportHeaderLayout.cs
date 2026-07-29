@@ -30,5 +30,14 @@ namespace PotatoOptimization.Patches
         {
             return controlCenterY - (controlHeight * 0.5f) - gap;
         }
+
+        internal static float GetFollowingControlCenterX(
+            float leftControlCenterX,
+            float leftControlWidth,
+            float rightControlWidth,
+            float gap)
+        {
+            return leftControlCenterX + ((leftControlWidth + rightControlWidth) * 0.5f) + gap;
+        }
     }
 }
