@@ -100,6 +100,19 @@ namespace PotatoOptimization.Core
       DontDestroyOnLoad(_runnerObject);
       _runnerObject.hideFlags = HideFlags.HideAndDontSave;
       _runnerObject.AddComponent<PotatoController>();
+
+      // 提前创建 ModSettingsManager，让第三方 MOD（如 Chill Env Sync）在插件启动后即可注册设置项。
+      // 否则管理器要等玩家第一次打开游戏设置界面（SettingUI.Setup Postfix）才懒创建，
+      // 依赖“等到 IsInitialized 再注册”的第三方 MOD 会因等不到管理器而注册失败。
+      EnsureModSettingsManager();
+    }
+
+    private static void EnsureModSettingsManager()
+    {
+      if (ModShared.ModSettingsManager.Instance != null) return;
+      var managerObj = new GameObject("ModSettingsManager");
+      UnityEngine.Object.DontDestroyOnLoad(managerObj);
+      managerObj.AddComponent<ModShared.ModSettingsManager>();
     }
   }
 }
