@@ -111,6 +111,10 @@ namespace PotatoOptimization.Core
     {
       if (ModShared.ModSettingsManager.Instance != null) return;
       var managerObj = new GameObject("ModSettingsManager");
+      // HideAndDontSave：对象不随场景卸载销毁。仅 DontDestroyOnLoad 在插件 Awake 早期
+      // （场景未稳定时）调用不可靠，场景切换会把管理器销毁，导致第三方 MOD 已注册的
+      // 设置项数据（如 Chill Env Sync）全部丢失，而 UI 不再重建。
+      managerObj.hideFlags = HideFlags.HideAndDontSave;
       UnityEngine.Object.DontDestroyOnLoad(managerObj);
       managerObj.AddComponent<ModShared.ModSettingsManager>();
     }

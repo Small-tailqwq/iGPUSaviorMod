@@ -82,6 +82,9 @@ namespace PotatoOptimization.UI
         if (manager == null)
         {
           GameObject managerObj = new GameObject("ModSettingsManager");
+          // 与提前创建路径保持一致：HideAndDontSave 保证跨场景存活，
+          // 否则玩家切换场景后再次打开设置界面会因管理器被销毁而丢失第三方已注册的设置项。
+          managerObj.hideFlags = HideFlags.HideAndDontSave;
           Object.DontDestroyOnLoad(managerObj);
           manager = managerObj.AddComponent<ModSettingsManager>();
         }
