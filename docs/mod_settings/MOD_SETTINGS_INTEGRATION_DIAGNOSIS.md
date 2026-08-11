@@ -1,5 +1,16 @@
 # 🔍 其他 MOD 无法注册到设置界面 - 根本原因分析
 
+> ## ⚠️ 本文档已过时（2025-12 编写，描述 v1.8 之前的旧 API）
+>
+> - 文中引用的 `Initialize(tabButton, contentParent, scrollRect)`、`ModContentParent` 属性、带 parent 参数的
+>   `AddToggle(parent, ...)` 均已废弃；当前公开 API 见
+>   [MIGRATION_GUIDE_FOR_EXTERNAL_MODS.md](../MIGRATION_GUIDE_FOR_EXTERNAL_MODS.md) 与
+>   [MOD_SETTINGS_INTEGRATION_GUIDE.md](./MOD_SETTINGS_INTEGRATION_GUIDE.md)。
+> - 文中建议的"等待 5 秒后放弃"是错误模式：`ModSettingsManager` 由 `SettingUI.Setup()` Postfix **懒创建**，
+>   玩家第一次打开设置界面前 `Instance` 为 null。正确做法是**无限等待** `Instance?.IsInitialized == true`
+>   后再注册（见两份指南的示例）。
+> - 保留本文档仅作历史参考，请勿按其中的 API 签名或超时建议实现第三方接入。
+
 我已排查了代码并找出了可能的问题。以下是诊断结果：
 
 ---
